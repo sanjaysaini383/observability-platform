@@ -276,7 +276,7 @@ Application → Collector → Kafka → Consumer → ClickHouse
 | Collector memory cap | `256 MiB` (spike: `128 MiB`) | Prevents OOM during traffic surges |
 | Kafka retry policy | `5s → 30s` backoff, `300s` max elapsed | Survives transient broker issues |
 | Consumer batch size | `100 spans` | Balances insert throughput vs. latency |
-| Consumer flush interval | `5,000 ms` | Bounded write delay to ClickHouse |
+| Consumer flush | End of every Kafka fetch batch | No in-memory buffer — nothing to lose on a crash |
 | Delivery guarantee | Offset commit **after** successful insert | At-least-once — no silent data loss |
 
 > [!TIP]
@@ -467,7 +467,7 @@ Benchmarked against the platform's documented targets on a 4-core / 8 GB Docker 
 | OTel Collector batch | 1,000 spans / 5s |
 | Collector memory limit | 256 MiB (spike: 128 MiB) |
 | Kafka consumer batch | 100 spans |
-| Kafka consumer flush | 5,000 ms |
+| Kafka consumer flush | End of every Kafka fetch batch |
 | ClickHouse index granularity | 8,192 rows |
 | Duration precision | Nanoseconds (`UInt64`) |
 
