@@ -665,7 +665,22 @@ Contributions are welcome — especially on tail-based sampling, the alerting en
 
 ---
 
-## 📄 License
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+
+| Document | Description |
+|:-----------|:-------------|
+| **[Architecture Guide](./docs/architecture.md)** | Deep dive into system design, components, and data flows |
+| **[Installation Guide](./docs/installation-guide.md)** | Step-by-step setup instructions with verification |
+| **[Configuration Guide](./docs/configuration-guide.md)** | Complete configuration reference for all components |
+| **[Observability Guide](./docs/observability-guide.md)** | Tracing, metrics, logging, and AI analysis explained |
+| **[Troubleshooting Guide](./docs/troubleshooting.md)** | Common issues, debugging, and solutions |
+| **[Contributing Guide](./docs/contributing.md)** | How to contribute to the project |
+
+---
+
+## License
 
 [MIT](./LICENSE) — use it, fork it, learn from it, put it on your resume.
 
