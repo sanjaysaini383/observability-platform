@@ -79,7 +79,8 @@ app.post('/reserve', async (req, res) => {
         let releaseErr;
         try {
             await client.query('BEGIN');
-            for (const item of items) {
+            const ordered = [...items].sort((a, b) => Number(a.productId) - Number(b.productId));
+            for (const item of ordered) {
                 const { rows } = await client.query('SELECT price, stock FROM products WHERE id = $1 FOR UPDATE', [item.productId]);
                 if (rows.length === 0) throw new Error(`Product ${item.productId} not found`);
                 if (rows[0].stock < item.qty) throw new Error(`Insufficient stock for product ${item.productId}`);
