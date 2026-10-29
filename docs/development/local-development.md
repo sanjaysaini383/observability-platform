@@ -5,7 +5,7 @@
 ### *Setting Up Development Environment*
 
 [![Development](https://img.shields.io/badge/Development-Local%20Setup-F59E0B?style=for-the-badge&logo=visualstudiocode&logoColor=white)](.)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20.19+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 
 *Guide for developers working on TraceLens*
 
@@ -15,16 +15,16 @@
 
 ## 📑 Table of Contents
 
-- [Prerequisites](#prerequisites)
-- [Development Options](#development-options)
-- [Full Stack with Docker](#full-stack-with-docker)
-- [Hybrid Development](#hybrid-development)
-- [Service-Specific Development](#service-specific-development)
-- [Debugging](#debugging)
-- [Testing](#testing)
-- [Code Style & Linting](#code-style--linting)
-- [Hot Reload](#hot-reload)
-- [Tips & Tricks](#tips--tricks)
+- [Prerequisites](#-prerequisites)
+- [Development Options](#-development-options)
+- [Full Stack with Docker](#-full-stack-with-docker)
+- [Hybrid Development](#-hybrid-development)
+- [Service-Specific Development](#-service-specific-development)
+- [Debugging](#-debugging)
+- [Testing](#-testing)
+- [Code Style & Linting](#-code-style--linting)
+- [Hot Reload](#-hot-reload)
+- [Tips & Tricks](#-tips--tricks)
 
 ---
 
@@ -32,7 +32,7 @@
 
 | Tool | Version | Purpose |
 |:------|:---------|:---------|
-| **Node.js** | 18.x or 20.x | Runtime for services |
+| **Node.js** | 20.19+ | Runtime for services; dashboard tooling (Vite 8 / ESLint 10) requires 20.19+ |
 | **npm** | 8+ | Package manager |
 | **Docker Desktop** | Latest | For full stack |
 | **Git** | Latest | Version control |
@@ -88,7 +88,9 @@ Run infrastructure in Docker, develop services locally for faster iteration.
 ### Start Infrastructure
 ```bash
 cd infra
-docker compose up -d zookeeper kafka clickhouse postgres redis otel-collector
+# Keep kafka-consumer in Docker: the broker advertises kafka:9092, which the
+# host cannot resolve. Add trace-analyser too if you want AI analysis.
+docker compose up -d zookeeper kafka clickhouse postgres redis otel-collector kafka-consumer
 ```
 
 ### Develop API Gateway Locally
@@ -103,8 +105,10 @@ SERVICE_NAME=api-gateway OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 node 
 ```bash
 cd query-api
 npm install
-CLICKHOUSE_URL=http://localhost:8123 REDIS_URL=redis://localhost:6379 node index.js
+CLICKHOUSE_URL=http://default:password@localhost:8123 REDIS_URL=redis://localhost:6379 node index.js
 ```
+
+If the password contains URL-reserved characters (`@`, `:`, `/`, `#`), percent-encode it in the URL.
 
 ### Develop Dashboard Locally
 ```bash
@@ -128,17 +132,21 @@ node --import ../tracing.js app.js
 ```
 
 ### Kafka Consumer
+Keep the consumer in Docker for hybrid development. Compose advertises the broker as `PLAINTEXT://kafka:9092`, so a process running on the host cannot connect to `localhost:9092`.
+
 ```bash
-cd kafka-consumer
-npm install
-KAFKA_BROKERS=localhost:9092 CLICKHOUSE_URL=http://localhost:8123 node index.js
+cd infra
+docker compose up -d kafka-consumer
+docker compose logs -f kafka-consumer
 ```
+
+If you must run it on the host, first add a second advertised listener to the `kafka` service (for example `PLAINTEXT_HOST://localhost:29092`) and use `KAFKA_BROKERS=localhost:29092`. Also pass ClickHouse credentials: `CLICKHOUSE_URL=http://default:password@localhost:8123`.
 
 ### Trace Analyzer
 ```bash
 cd query-api/workers
 npm install
-CLICKHOUSE_URL=http://localhost:8123 LLM_PROVIDER=mock node trace-analyser.js
+CLICKHOUSE_URL=http://default:password@localhost:8123 LLM_PROVIDER=mock node trace-analyser.js
 ```
 
 ---
@@ -173,7 +181,7 @@ Create `.vscode/launch.json`:
       "program": "${workspaceFolder}/query-api/index.js",
       "env": {
         "PORT": "4000",
-        "CLICKHOUSE_URL": "http://localhost:8123",
+        "CLICKHOUSE_URL": "http://default:password@localhost:8123",
         "REDIS_URL": "redis://localhost:6379"
       }
     }
@@ -389,6 +397,6 @@ docker compose logs | grep -i error
 
 <div align="center">
 
-**[← Back to Docs](../README.md)** | **[Testing Guide →](./testing-guide.md)**
+**[← Back to Docs](../../README.md)** | **[Contributing Guide →](../contributing.md)**
 
 </div>
