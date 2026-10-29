@@ -15,17 +15,17 @@
 
 ## 📑 Table of Contents
 
-- [Security Overview](#security-overview)
-- [Current Security Posture](#current-security-posture)
-- [Authentication & Authorization](#authentication--authorization)
-- [Network Security](#network-security)
-- [Secrets Management](#secrets-management)
-- [Database Security](#database-security)
-- [API Security](#api-security)
-- [Container Security](#container-security)
-- [Monitoring & Auditing](#monitoring--auditing)
-- [Incident Response](#incident-response)
-- [Security Checklist](#security-checklist)
+- [Security Overview](#-security-overview)
+- [Current Security Posture](#-current-security-posture)
+- [Authentication & Authorization](#-authentication--authorization)
+- [Network Security](#-network-security)
+- [Secrets Management](#-secrets-management)
+- [Database Security](#-database-security)
+- [API Security](#-api-security)
+- [Container Security](#-container-security)
+- [Monitoring & Auditing](#-monitoring--auditing)
+- [Incident Response](#-incident-response)
+- [Security Checklist](#-security-checklist)
 
 ---
 
@@ -131,6 +131,38 @@ sudo ufw allow 443/tcp   # HTTPS
 sudo ufw enable
 ```
 
+> **Warning:** UFW alone does not protect Docker-published ports. Docker writes its own iptables rules in the `DOCKER`/`DOCKER-USER` chains, which bypass UFW's `INPUT` rules. Every port published in `infra/docker-compose.yml` is currently bound to `0.0.0.0`, so ClickHouse (`8123`, `9000`), Redis (`6379`), PostgreSQL (`5432`), Kafka (`9092`), and the rest remain reachable from the internet even when UFW is enabled.
+
+**Recommended: bind internal ports to loopback in compose.** Only the reverse proxy (`80`/`443`) should listen on a public interface:
+
+```yaml
+services:
+  clickhouse:
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+  kafka:
+    ports:
+      - "127.0.0.1:9092:9092"
+  # Repeat for 2181, 3000, 3001, 4000, 4317, 4318, 5000-5002, 8080
+```
+
+**Alternative: filter in the `DOCKER-USER` chain.** These rules take precedence over Docker's own forwarding rules:
+
+```bash
+sudo iptables -I DOCKER-USER -p tcp --dport 8123 -j DROP
+sudo iptables -I DOCKER-USER -p tcp --dport 9000 -j DROP
+# Repeat for 2181, 3001, 4000, 4317, 4318, 5000-5002, 5432, 6379, 8080, 9092
+```
+
+Keep only `22`, `80`, and `443` publicly reachable. The "Never expose" list below assumes that either loopback binding or `DOCKER-USER` filtering is in place.
+
 **Never expose:** 3000, 4000, 4317, 4318, 5432, 6379, 8080, 8123, 9000, 9092
 
 ### Reverse Proxy with TLS
@@ -197,15 +229,40 @@ server {
 openssl rand -base64 32
 ```
 
-#### Update .env
+#### Current `.env` support
+
+`infra/.env` is read by Docker Compose, but it is **not** a shell. Values such as `CLICKHOUSE_PASSWORD=$(openssl rand -base64 32)` are stored literally, not executed. The only variables currently consumed by the stack are:
+
 ```env
-JWT_SECRET=$(openssl rand -base64 64)
-CLICKHOUSE_PASSWORD=$(openssl rand -base64 32)
-POSTGRES_PASSWORD=$(openssl rand -base64 32)
-REDIS_PASSWORD=$(openssl rand -base64 32)
-API_KEY=$(openssl rand -base64 32)
 GROQ_API_KEY=your_actual_key
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+SMTP_USER=
+SMTP_PASS=
 ```
+
+`JWT_SECRET`, `API_KEY`, and `REDIS_PASSWORD` are **not read by the current code**. `api-gateway` still uses a hard-coded JWT secret, `query-api` has no authentication, and Redis has no password configured.
+
+> **Warning:** Do not change `CLICKHOUSE_PASSWORD`/`POSTGRES_PASSWORD` in `.env` on their own. The compose file hard-codes `default:password` in `CLICKHOUSE_URL`, `ORDER_DB_URL`, and `INVENTORY_DB_URL`, so the services would keep connecting with the old credentials and ingestion would silently stop.
+
+#### If you rotate the database passwords
+
+Update **every** reference together, or the stack will break:
+
+- [ ] `infra/docker-compose.yml` → `clickhouse.environment.CLICKHOUSE_PASSWORD`
+- [ ] `infra/docker-compose.yml` → `postgres.environment.POSTGRES_PASSWORD`
+- [ ] `infra/docker-compose.yml` → `kafka-consumer.environment.CLICKHOUSE_URL`
+- [ ] `infra/docker-compose.yml` → `query-api.environment.CLICKHOUSE_URL`
+- [ ] `infra/docker-compose.yml` → `trace-analyser.environment.CLICKHOUSE_URL`
+- [ ] `infra/docker-compose.yml` → `order-service.environment.ORDER_DB_URL`
+- [ ] `infra/docker-compose.yml` → `inventory-service.environment.INVENTORY_DB_URL`
+- [ ] `infra/docker-compose.yml` → `postgres.healthcheck` (`pg_isready` credentials, if the check starts using a password)
+- [ ] Any host-side environment used for hybrid development (`CLICKHOUSE_URL`, `ORDER_DB_URL`, `INVENTORY_DB_URL`)
+- [ ] URL-encode any new password that contains reserved characters (for example `@`, `:`, `/`, `#`) before placing it in a connection URL
+- [ ] Redis: add `--requirepass` to the server command **and** put the password in every `REDIS_URL`
+- [ ] `JWT_SECRET` / `API_KEY`: wire these into `api-gateway` and `query-api` in code before documenting them as usable
+
+Until those code and compose changes exist, treat password rotation as unsupported.
 
 #### Use Secret Managers
 - **AWS Secrets Manager**
@@ -320,7 +377,7 @@ app.use(cors({
 ```
 
 ### SQL Injection Prevention
-Current `escSql()` is basic. For production:
+The shared helper in [`shared/sql-utils.js`](../../shared/sql-utils.js) escapes backslashes **before** single quotes, which prevents the trailing-backslash bypass that a naïve `replace(/'/g, "''")` is vulnerable to. For production, additionally:
 - Use parameterized queries where possible
 - Implement query whitelisting
 - Use least privilege database users
@@ -332,7 +389,7 @@ Current `escSql()` is basic. For production:
 
 ### Dockerfile Best Practices
 ```dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 # Run as non-root user
@@ -488,6 +545,6 @@ docker compose logs > incident-$(date +%Y%m%d).log
 
 <div align="center">
 
-**[← Back to Docs](../README.md)** | **[Development Guide →](../development/local-development.md)**
+**[← Back to Docs](../../README.md)** | **[Development Guide →](../development/local-development.md)**
 
 </div>
