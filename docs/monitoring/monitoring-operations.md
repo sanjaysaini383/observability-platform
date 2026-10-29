@@ -15,17 +15,17 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Health Monitoring](#health-monitoring)
-- [Performance Monitoring](#performance-monitoring)
-- [Data Pipeline Monitoring](#data-pipeline-monitoring)
-- [Alerting](#alerting)
-- [Logging & Log Analysis](#logging--log-analysis)
-- [Capacity Planning](#capacity-planning)
-- [Incident Response](#incident-response)
-- [Maintenance Procedures](#maintenance-procedures)
-- [Runbooks](#runbooks)
-- [Metrics Dashboard](#metrics-dashboard)
+- [Overview](#-overview)
+- [Health Monitoring](#-health-monitoring)
+- [Performance Monitoring](#-performance-monitoring)
+- [Data Pipeline Monitoring](#-data-pipeline-monitoring)
+- [Alerting](#-alerting)
+- [Logging & Log Analysis](#-logging--log-analysis)
+- [Capacity Planning](#-capacity-planning)
+- [Incident Response](#-incident-response)
+- [Maintenance Procedures](#-maintenance-procedures)
+- [Runbooks](#-runbooks)
+- [Metrics Dashboard](#-metrics-dashboard)
 
 ---
 
@@ -357,6 +357,6 @@ GROUP BY table;
 
 <div align="center">
 
-**[← Back to Docs](../README.md)** | **[Testing Guide →](./testing-guide.md)**
+**[← Back to Docs](../../README.md)** | **[Prometheus & Grafana Setup →](./prometheus-grafana-setup.md)**
 
 </div>
