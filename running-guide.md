@@ -296,6 +296,6 @@ Use `down -v` if you want a completely fresh start (e.g. after a schema change t
 ## 12. Related docs
 
 - [`README.md`](./README.md) — architecture, design rationale, engineering tradeoffs
-- [`observability-platform-roadmap.md`](./observability-platform-roadmap.md) — planned future work
+- [`observability-platform-roadmap.md`](https://github.com/sanjaysaini383/observability-platform/blob/docs-archive/observability-platform-roadmap.md) — planned future work
 - [`infra/clickhouse/init.sql`](./infra/clickhouse/init.sql) — ClickHouse schema
 - [`collector/otelcol-config.yaml`](./collector/otelcol-config.yaml) — OTel Collector pipeline config

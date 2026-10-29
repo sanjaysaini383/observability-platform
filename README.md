@@ -641,7 +641,7 @@ Get a free key at [console.groq.com](https://console.groq.com). Without it, set 
 | 🟢 Low | **SLO / error budget tracking** | Burn-rate alerts on latency and availability SLOs |
 | 🟢 Low | **Log-trace correlation** | Unified view linking `TraceId` across logs and spans |
 
-See the full build roadmap: [`observability-platform-roadmap.md`](./observability-platform-roadmap.md)
+See the full build roadmap (on the `docs-archive` branch): [`observability-platform-roadmap.md`](https://github.com/sanjaysaini383/observability-platform/blob/docs-archive/observability-platform-roadmap.md)
 
 ---
 
