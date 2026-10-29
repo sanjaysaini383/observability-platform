@@ -1,6 +1,7 @@
 import express from 'express';
 import { trace } from '@opentelemetry/api';
 import pkg from 'pg';
+import { logError } from '../tracing.js';
 
 const { Pool } = pkg;
 const app = express();
@@ -55,6 +56,7 @@ app.get('/products', async (req, res) => {
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
+        logError('Failed to fetch products', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -92,6 +94,7 @@ app.post('/reserve', async (req, res) => {
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
+        logError('Stock reservation failed', err);
         res.status(500).json({ error: err.message });
     }
 });

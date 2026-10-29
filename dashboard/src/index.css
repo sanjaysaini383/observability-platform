@@ -12,7 +12,8 @@
     --popover: 226 20% 12%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
+    /* TraceLens brand — aqua/teal, validated for CVD + contrast against this dark surface */
+    --primary: 159 73% 36%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 226 20% 20%;
@@ -21,18 +22,35 @@
     --muted: 226 20% 20%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 91% 60%;
+    --accent: 159 73% 36%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 84% 60%;
+    /* Status palette (fixed — never re-themed): good / warning / serious / critical */
+    --destructive: 0 61% 52%;
     --destructive-foreground: 210 40% 98%;
 
-    --success: 160 84% 39%;
+    --success: 120 86% 34%;
     --success-foreground: 210 40% 98%;
+
+    --warning: 41 96% 54%;
+    --warning-foreground: 20 14% 8%;
+
+    --serious: 17 79% 64%;
+    --serious-foreground: 20 14% 8%;
 
     --border: 226 19% 20%;
     --input: 226 19% 20%;
-    --ring: 217 91% 60%;
+    --ring: 159 73% 36%;
+
+    /* Categorical chart palette — validated CVD-safe order for multi-series charts */
+    --chart-1: 213 77% 56%; /* blue */
+    --chart-2: 17 70% 50%;  /* orange */
+    --chart-3: 159 73% 36%; /* aqua (brand) */
+    --chart-4: 40 100% 39%; /* yellow */
+    --chart-5: 338 61% 58%; /* magenta */
+    --chart-6: 120 100% 26%; /* green */
+    --chart-7: 247 69% 72%; /* violet */
+    --chart-8: 0 72% 65%;   /* red */
 
     --radius: 0.5rem;
   }

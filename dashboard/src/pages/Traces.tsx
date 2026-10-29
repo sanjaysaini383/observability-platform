@@ -45,7 +45,10 @@ export default function Traces() {
   return (
     <div className="flex h-full gap-6">
       <div className={`flex-1 flex flex-col transition-all ${selectedTrace ? 'w-2/3' : 'w-full'}`}>
-        <h2 className="text-3xl font-bold tracking-tight mb-6">Traces Explorer</h2>
+        <div className="mb-6">
+          <h2 className="text-3xl font-bold tracking-tight">Traces Explorer</h2>
+          <p className="text-sm text-muted-foreground mt-1">Search and inspect distributed traces across every service</p>
+        </div>
 
         <Card className="flex-1 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-border flex gap-4 bg-muted/20">
@@ -101,10 +104,7 @@ export default function Traces() {
                       <TableCell>{trace.operationName}</TableCell>
                       <TableCell>{trace.durationMs ? `${Math.round(trace.durationMs)}ms` : '-'}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={trace.statusCode === 'ERROR' ? 'destructive' : 'default'}
-                          className={trace.statusCode === 'ERROR' ? '' : 'bg-success hover:bg-success'}
-                        >
+                        <Badge variant={trace.statusCode === 'ERROR' ? 'destructive' : 'success'}>
                           {trace.statusCode}
                         </Badge>
                       </TableCell>

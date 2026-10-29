@@ -3,12 +3,13 @@ import ReactFlow, { Background, Controls, useNodesState, useEdgesState } from 'r
 import type { Edge, Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Card, CardContent } from '@/components/ui/card';
+import { Network } from 'lucide-react';
 import { fetchServices, fetchMetrics } from '@/lib/api';
 
 const NODE_STYLE = {
-  background: '#1e293b',
-  color: '#f8fafc',
-  border: '2px solid #475569',
+  background: 'hsl(var(--card))',
+  color: 'hsl(var(--foreground))',
+  border: '1.5px solid hsl(var(--border))',
   borderRadius: '8px',
   padding: '10px',
   fontSize: '12px',
@@ -32,7 +33,7 @@ function buildGraph(
     target: e.target,
     animated: true,
     label: `${Math.round(e.avgLatencyMs)}ms`,
-    style: e.avgLatencyMs > 500 ? { stroke: '#ef4444' } : undefined,
+    style: e.avgLatencyMs > 500 ? { stroke: 'hsl(var(--destructive))' } : { stroke: 'hsl(var(--primary))' },
   }));
 
   return { nodes: flowNodes, edges: flowEdges };
@@ -82,7 +83,10 @@ export default function Services() {
   return (
     <div className="flex h-full gap-6">
       <div className="flex-1 flex flex-col h-[calc(100vh-6rem)]">
-        <h2 className="text-3xl font-bold tracking-tight mb-6">Service Dependency Graph</h2>
+        <div className="mb-6">
+          <h2 className="text-3xl font-bold tracking-tight">Service Dependency Graph</h2>
+          <p className="text-sm text-muted-foreground mt-1">Live call paths between services — click a node for details</p>
+        </div>
         <Card className="flex-1 overflow-hidden">
           {loading && nodes.length === 0 ? (
             <div className="flex h-full items-center justify-center text-muted-foreground">Loading service map...</div>
@@ -94,9 +98,9 @@ export default function Services() {
               onEdgesChange={onEdgesChange}
               onNodeClick={onNodeClick}
               fitView
-              className="bg-[#0F1117]"
+              className="bg-background"
             >
-              <Background color="#2A2D3E" gap={16} />
+              <Background color="hsl(var(--border))" gap={16} />
               <Controls className="bg-card border-border fill-foreground text-foreground" />
             </ReactFlow>
           )}
@@ -111,11 +115,11 @@ export default function Services() {
           </div>
           <CardContent className="p-4 space-y-4">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-primary/20 rounded-2xl mx-auto flex items-center justify-center mb-2 border border-primary/30">
-                <span className="text-2xl">⚡</span>
+              <div className="w-16 h-16 bg-primary/15 rounded-2xl mx-auto flex items-center justify-center mb-2 border border-primary/30">
+                <Network className="w-7 h-7 text-primary" />
               </div>
               <h4 className="font-bold text-lg">{selectedNode.id}</h4>
-              <span className="text-sm text-green-400 bg-green-400/10 px-2 py-1 rounded-full">Healthy</span>
+              <span className="text-sm text-success bg-success/10 px-2 py-1 rounded-full">Healthy</span>
             </div>
 
             <div className="space-y-3">

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔭 Observability Platform
+# 🔭 TraceLens
 
 ### **Distributed tracing, OLAP analytics, and AI-powered root cause analysis — self-hosted, production-grade, zero SaaS lock-in.**
 
@@ -39,7 +39,7 @@ Without observability, incident response looks like this:
 
 Commercial APM solves this — at **$19–$25/host/month**. At 50 services, that's **$10K+/year** for telemetry you don't own.
 
-**Observability Platform** is a self-hosted, open-source alternative that implements the same ingestion → buffer → OLAP → query → AI pipeline used in production observability systems — without vendor lock-in, without per-host pricing, and without sacrificing the engineering rigor that makes these systems work at scale.
+**TraceLens** is a self-hosted, open-source alternative that implements the same ingestion → buffer → OLAP → query → AI pipeline used in production observability systems — without vendor lock-in, without per-host pricing, and without sacrificing the engineering rigor that makes these systems work at scale.
 
 ---
 

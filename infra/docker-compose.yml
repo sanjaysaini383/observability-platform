@@ -232,7 +232,8 @@ services:
 
   kafka-consumer:
     build:
-      context: ../kafka-consumer
+      context: ..
+      dockerfile: kafka-consumer/Dockerfile
     depends_on:
       kafka:
         condition: service_healthy
@@ -248,7 +249,8 @@ services:
 
   query-api:
     build:
-      context: ../query-api
+      context: ..
+      dockerfile: query-api/Dockerfile
     ports:
       - "4000:4000"
     depends_on:
@@ -271,8 +273,8 @@ services:
 
   trace-analyser:
     build:
-      context: ../query-api/workers
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: query-api/workers/Dockerfile
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -280,7 +282,7 @@ services:
       CLICKHOUSE_URL: http://default:password@clickhouse:8123
       LLM_PROVIDER: groq
       GROQ_API_KEY: ${GROQ_API_KEY}      # loaded from infra/.env
-      GROQ_MODEL: llama3-8b-8192          # free model on Groq
+      GROQ_MODEL: llama-3.1-8b-instant    # free model on Groq (llama3-8b-8192 was decommissioned)
       ANALYSIS_INTERVAL: 60000
     networks:
       - observability

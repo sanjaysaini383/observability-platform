@@ -38,17 +38,30 @@ export default function AiInsights() {
     high: insights.filter((i) => i.severity === 'HIGH').length,
   };
 
-  const getSeverityColor = (sev: string) => {
+  const getSeverityVariant = (sev: string) => {
     switch (sev) {
       case 'CRITICAL': return 'destructive';
-      case 'HIGH': return 'default';
+      case 'HIGH': return 'serious';
+      case 'MEDIUM': return 'warning';
       default: return 'secondary';
+    }
+  };
+
+  const getSeverityBarClass = (sev: string) => {
+    switch (sev) {
+      case 'CRITICAL': return 'bg-destructive';
+      case 'HIGH': return 'bg-serious';
+      case 'MEDIUM': return 'bg-warning';
+      default: return 'bg-muted';
     }
   };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
-      <h2 className="text-3xl font-bold tracking-tight">AI Root Cause Insights</h2>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">AI Root Cause Insights</h2>
+        <p className="text-sm text-muted-foreground mt-1">LLM-generated root cause analysis for recent error traces</p>
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
         <Card className="bg-muted/20 border-border/50">
@@ -69,13 +82,13 @@ export default function AiInsights() {
             <AlertCircle className="w-8 h-8 text-destructive/40" />
           </CardContent>
         </Card>
-        <Card className="bg-orange-500/5 border-orange-500/20">
+        <Card className="bg-serious/5 border-serious/20">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">High Severity</p>
-              <h3 className="text-3xl font-bold text-orange-500 mt-1">{stats.high}</h3>
+              <h3 className="text-3xl font-bold text-serious mt-1">{stats.high}</h3>
             </div>
-            <AlertCircle className="w-8 h-8 text-orange-500/40" />
+            <AlertCircle className="w-8 h-8 text-serious/40" />
           </CardContent>
         </Card>
       </div>
@@ -112,7 +125,7 @@ export default function AiInsights() {
         ) : filtered.length === 0 ? (
           <Card className="bg-muted/10 border-dashed">
             <CardContent className="py-12 flex flex-col items-center justify-center text-center">
-              <CheckCircle2 className="w-12 h-12 text-green-500/50 mb-4" />
+              <CheckCircle2 className="w-12 h-12 text-success/50 mb-4" />
               <h3 className="text-xl font-semibold mb-2">No active incidents</h3>
               <p className="text-muted-foreground max-w-sm">The LLM has not detected any anomalous traces in the last period. Your system is running smoothly.</p>
             </CardContent>
@@ -120,14 +133,11 @@ export default function AiInsights() {
         ) : (
           filtered.map((insight) => (
             <Card key={insight.traceId} className="overflow-hidden border-border transition-all hover:border-primary/30">
-              <div className={`h-1 w-full ${insight.severity === 'CRITICAL' ? 'bg-destructive' : 'bg-orange-500'}`} />
+              <div className={`h-1 w-full ${getSeverityBarClass(insight.severity)}`} />
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-3 items-center">
-                    <Badge
-                      variant={getSeverityColor(insight.severity) as 'destructive' | 'default' | 'secondary'}
-                      className={insight.severity === 'HIGH' ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}
-                    >
+                    <Badge variant={getSeverityVariant(insight.severity) as 'destructive' | 'serious' | 'warning' | 'secondary'}>
                       {insight.severity}
                     </Badge>
                     <span className="font-semibold text-lg">{insight.serviceName}</span>

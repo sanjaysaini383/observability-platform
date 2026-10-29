@@ -35,7 +35,10 @@ export default function Metrics() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
-        <h2 className="text-3xl font-bold tracking-tight">System Metrics</h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">System Metrics</h2>
+          <p className="text-sm text-muted-foreground mt-1">Latency, throughput, and error trends per service</p>
+        </div>
         <select
           className="bg-card border border-border text-sm rounded-md px-4 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
           value={service}
@@ -71,25 +74,25 @@ export default function Metrics() {
                   <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorP99" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                        <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorP95" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                        <stop offset="5%" stopColor="hsl(var(--warning))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--warning))" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorP50" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2A2D3E" vertical={false} />
-                    <XAxis dataKey="time" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1A1D27', border: '1px solid #2A2D3E' }} />
-                    <Area type="monotone" dataKey="p99" stroke="#ef4444" fillOpacity={1} fill="url(#colorP99)" />
-                    <Area type="monotone" dataKey="p95" stroke="#f59e0b" fillOpacity={1} fill="url(#colorP95)" />
-                    <Area type="monotone" dataKey="p50" stroke="#3b82f6" fillOpacity={1} fill="url(#colorP50)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                    <Area type="monotone" dataKey="p99" stroke="hsl(var(--destructive))" fillOpacity={1} fill="url(#colorP99)" />
+                    <Area type="monotone" dataKey="p95" stroke="hsl(var(--warning))" fillOpacity={1} fill="url(#colorP95)" />
+                    <Area type="monotone" dataKey="p50" stroke="hsl(var(--chart-1))" fillOpacity={1} fill="url(#colorP50)" />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
@@ -107,11 +110,11 @@ export default function Metrics() {
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#2A2D3E" vertical={false} />
-                      <XAxis dataKey="time" stroke="#64748b" fontSize={12} hide />
-                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ backgroundColor: '#1A1D27', border: '1px solid #2A2D3E' }} />
-                      <Area type="step" dataKey="rps" stroke="#10b981" fillOpacity={0.1} fill="#10b981" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} hide />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                      <Area type="step" dataKey="rps" stroke="hsl(var(--success))" fillOpacity={0.12} fill="hsl(var(--success))" />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -128,11 +131,11 @@ export default function Metrics() {
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#2A2D3E" vertical={false} />
-                      <XAxis dataKey="time" stroke="#64748b" fontSize={12} hide />
-                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ backgroundColor: '#1A1D27', border: '1px solid #2A2D3E' }} />
-                      <Area type="step" dataKey="errors" stroke="#ef4444" fillOpacity={0.1} fill="#ef4444" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} hide />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                      <Area type="step" dataKey="errors" stroke="hsl(var(--destructive))" fillOpacity={0.12} fill="hsl(var(--destructive))" />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -157,7 +160,7 @@ export default function Metrics() {
                       </div>
                       <div className="text-sm">
                         <span className="text-destructive mr-3">P99: {alert.p99Ms.toFixed(0)}ms</span>
-                        <span className="text-orange-400">Errors: {alert.errorRatePct.toFixed(1)}%</span>
+                        <span className="text-serious">Errors: {alert.errorRatePct.toFixed(1)}%</span>
                       </div>
                     </div>
                   ))}

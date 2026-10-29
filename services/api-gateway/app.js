@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
+import { logError } from '../tracing.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -42,6 +43,7 @@ app.get('/products', async (req, res) => {
         });
         res.json(response.data);
     } catch (err) {
+        logError('Failed to fetch products', err);
         res.status(500).json({ error: err.message, service: 'api-gateway' });
     }
 });
@@ -80,6 +82,7 @@ app.post('/checkout', authenticate, async (req, res) => {
         res.json({ success: true, orderId, transactionId: paymentRes.data.transactionId });
     } catch (err) {
         console.error('Checkout error:', err.message);
+        logError('Checkout failed', err);
         res.status(err.response?.status || 500).json({ 
             error: err.message,
             service: 'api-gateway'

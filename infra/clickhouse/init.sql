@@ -97,6 +97,17 @@ PARTITION BY toYYYYMMDD(AnalysedAt)
 TTL toDateTime(AnalysedAt) + INTERVAL 30 DAY
 SETTINGS index_granularity = 8192;
 
+-- Analysis attempts: append-only log of failed LLM analysis attempts, so
+-- trace-analyser can cap retries on a trace that keeps failing (bad prompt,
+-- persistent rate limit) instead of re-attempting it forever on every poll.
+CREATE TABLE IF NOT EXISTS analysis_attempts (
+  TraceId     String,
+  AttemptedAt DateTime64(3, 'UTC')
+) ENGINE = MergeTree()
+ORDER BY (TraceId, AttemptedAt)
+TTL toDateTime(AttemptedAt) + INTERVAL 7 DAY
+SETTINGS index_granularity = 8192;
+
 -- Service dependency view: joins spans to track call paths
 CREATE VIEW IF NOT EXISTS service_dependencies AS
 SELECT

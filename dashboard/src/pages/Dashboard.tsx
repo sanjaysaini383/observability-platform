@@ -53,7 +53,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <p className="text-sm text-muted-foreground mt-1">Live overview of request volume, latency, and system health</p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -103,8 +106,8 @@ export default function Dashboard() {
             {data.sparkline.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.sparkline}>
-                  <Tooltip contentStyle={{ backgroundColor: '#1A1D27', border: '1px solid #2A2D3E' }} />
-                  <Line type="monotone" dataKey="value" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                  <Line type="monotone" dataKey="value" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -123,7 +126,7 @@ export default function Dashboard() {
                 <div key={insight.traceId} className="flex flex-col gap-1 border-b border-border pb-3 last:border-0">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-sm text-primary">{insight.serviceName}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${insight.severity === 'CRITICAL' ? 'bg-destructive/20 text-destructive' : 'bg-orange-500/20 text-orange-500'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${insight.severity === 'CRITICAL' ? 'bg-destructive/20 text-destructive' : 'bg-serious/20 text-serious'}`}>
                       {insight.severity}
                     </span>
                   </div>

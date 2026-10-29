@@ -18,6 +18,9 @@
     "@opentelemetry/sdk-metrics": "^1.21.0",
     "@opentelemetry/sdk-trace-node": "^1.21.0",
     "@opentelemetry/resources": "^1.21.0",
-    "@opentelemetry/semantic-conventions": "^1.21.0"
+    "@opentelemetry/semantic-conventions": "^1.21.0",
+    "@opentelemetry/api-logs": "^0.50.0",
+    "@opentelemetry/sdk-logs": "^0.50.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "^0.50.0"
   }
 }

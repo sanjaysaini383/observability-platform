@@ -3,6 +3,7 @@ import axios from 'axios';
 import { createClient } from 'redis';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { escSql, resolveWindow } from './helpers.js';
 
 dotenv.config();
 
@@ -37,25 +38,23 @@ async function queryClickHouse(sql, format = 'JSON') {
   try {
     // POST the SQL as request body with FORMAT appended — works on all ClickHouse versions.
     // The ?format= URL parameter was removed in ClickHouse 24.x.
+    // formatdatetime_parsedatetime_m_is_month_name=0 keeps %M meaning "minute" in
+    // formatDateTime(); without it, this ClickHouse build renders %M as the full
+    // month name (e.g. "22:July:14" instead of "22:07:14").
     const query = `${sql.trim()} FORMAT ${format}`;
-    const response = await axios.post(CLICKHOUSE_BASE, query, {
-      headers: { 'Content-Type': 'text/plain' },
-      timeout: 10000,
-    });
+    const response = await axios.post(
+      `${CLICKHOUSE_BASE}?formatdatetime_parsedatetime_m_is_month_name=0`,
+      query,
+      {
+        headers: { 'Content-Type': 'text/plain' },
+        timeout: 10000,
+      }
+    );
     return response.data;
   } catch (error) {
     console.error('ClickHouse query error:', error.message);
     throw error;
   }
-}
-
-/**
- * Helper: Safely escape a string value for ClickHouse SQL
- * Prevents SQL injection by escaping single quotes and backslashes
- */
-function escSql(value) {
-  if (typeof value !== 'string') return String(value);
-  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 /**
@@ -83,14 +82,6 @@ async function cachedQuery(key, query, ttl = CACHE_TTL) {
   } catch (error) {
     throw error;
   }
-}
-
-/**
- * Resolve time window string to ClickHouse interval expression
- */
-function resolveWindow(window) {
-  const map = { '1h': '1 HOUR', '6h': '6 HOUR', '24h': '24 HOUR', '7d': '7 DAY' };
-  return map[window] || '1 HOUR';
 }
 
 /**

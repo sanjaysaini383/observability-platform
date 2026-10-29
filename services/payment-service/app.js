@@ -1,6 +1,7 @@
 import express from 'express';
 import { trace } from '@opentelemetry/api';
 import Razorpay from 'razorpay';
+import { logError } from '../tracing.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -50,6 +51,7 @@ app.post('/pay', async (req, res) => {
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
+        logError('Payment processing failed', err);
         res.status(500).json({ error: err.message });
     }
 });

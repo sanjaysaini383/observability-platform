@@ -1,6 +1,13 @@
 import { Kafka, logLevel } from 'kafkajs';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import {
+  escSql,
+  attributesToMapSql,
+  parseTraceMessage,
+  parseMetricsMessage,
+  parseLogsMessage,
+} from './otlp-parser.js';
 
 dotenv.config();
 
@@ -24,14 +31,6 @@ const consumer = kafka.consumer({ groupId: 'otel-consumer-group' });
 let tracesBatch = [];
 let metricsBatch = [];
 let logsBatch = [];
-
-/**
- * Safely escape a string for ClickHouse SQL single-quoted values
- */
-function escSql(value) {
-  if (typeof value !== 'string') return String(value ?? '');
-  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
 
 /**
  * Insert spans into ClickHouse
@@ -60,8 +59,8 @@ async function insertTraces(spans) {
       ${span.durationNano},
       ${span.statusCode},
       '${escSql(span.statusMessage || '')}',
-      {},
-      {}
+      ${attributesToMapSql(span.attributes)},
+      ${attributesToMapSql(span.resourceAttributes)}
     )`
     )
     .join(',\n');
@@ -74,57 +73,86 @@ async function insertTraces(spans) {
     console.log(`✓ Inserted ${spans.length} traces into ClickHouse`);
   } catch (error) {
     console.error(`✗ Failed to insert traces: ${error.message}`);
+    if (error.response?.data) console.error('ClickHouse response:', error.response.data);
     // Rethrow to trigger retry mechanism
     throw error;
   }
 }
 
 /**
- * Parse OTLP JSON trace message and flatten to individual spans.
- * The collector encodes as otlp_json so messages are plain JSON strings.
+ * Insert metric data points into ClickHouse
  */
-function parseTraceMessage(buffer) {
+async function insertMetrics(rows) {
+  if (rows.length === 0) return;
+
+  const sql = `
+    INSERT INTO metrics (
+      ServiceName, MetricName, MetricType, Timestamp, Value, Attributes
+    ) VALUES
+  `;
+
+  const values = rows
+    .map(
+      (row) => `(
+      '${escSql(row.serviceName || 'unknown')}',
+      '${escSql(row.metricName || 'unknown')}',
+      '${escSql(row.metricType || 'unknown')}',
+      ${row.timestampUnixNano},
+      ${Number.isFinite(row.value) ? row.value : 0},
+      ${attributesToMapSql(row.attributes)}
+    )`
+    )
+    .join(',\n');
+
   try {
-    const decoded = JSON.parse(buffer.toString('utf8'));
-    const spans = [];
-
-    const resourceSpans = decoded.resourceSpans || decoded.resource_spans || [];
-    for (const resourceSpan of resourceSpans) {
-      // Extract service name from resource attributes
-      const attrs = resourceSpan.resource?.attributes || [];
-      const serviceAttr = attrs.find(
-        (a) => a.key === 'service.name'
-      );
-      const serviceName = serviceAttr?.value?.stringValue ||
-        serviceAttr?.value?.string_value || 'unknown';
-
-      const scopeSpans = resourceSpan.scopeSpans || resourceSpan.scope_spans || [];
-      for (const scopeSpan of scopeSpans) {
-        const rawSpans = scopeSpan.spans || [];
-        for (const span of rawSpans) {
-          // traceId / spanId arrive as hex strings in otlp_json
-          spans.push({
-            traceId:      span.traceId      || span.trace_id      || '',
-            spanId:       span.spanId       || span.span_id       || '',
-            parentSpanId: span.parentSpanId || span.parent_span_id || '',
-            serviceName,
-            operationName: span.name || 'unknown',
-            startTimeUnixNano: BigInt(span.startTimeUnixNano || span.start_time_unix_nano || 0),
-            endTimeUnixNano:   BigInt(span.endTimeUnixNano   || span.end_time_unix_nano   || 0),
-            durationNano:
-              BigInt(span.endTimeUnixNano   || span.end_time_unix_nano   || 0) -
-              BigInt(span.startTimeUnixNano || span.start_time_unix_nano || 0),
-            statusCode:    span.status?.code    || 0,
-            statusMessage: span.status?.message || '',
-          });
-        }
-      }
-    }
-
-    return spans;
+    await axios.post(CLICKHOUSE_URL, sql + values, {
+      headers: { 'Content-Type': 'text/plain' },
+      timeout: 5000,
+    });
+    console.log(`✓ Inserted ${rows.length} metrics into ClickHouse`);
   } catch (error) {
-    console.error('Failed to parse trace message:', error.message);
-    return [];
+    console.error(`✗ Failed to insert metrics: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Insert log records into ClickHouse
+ */
+async function insertLogs(rows) {
+  if (rows.length === 0) return;
+
+  const sql = `
+    INSERT INTO logs (
+      ServiceName, Timestamp, SeverityText, SeverityNumber, Body,
+      TraceId, SpanId, Attributes
+    ) VALUES
+  `;
+
+  const values = rows
+    .map(
+      (row) => `(
+      '${escSql(row.serviceName || 'unknown')}',
+      ${row.timestampUnixNano},
+      '${escSql(row.severityText || '')}',
+      ${row.severityNumber || 0},
+      '${escSql(row.body || '')}',
+      '${escSql(row.traceId || '')}',
+      '${escSql(row.spanId || '')}',
+      ${attributesToMapSql(row.attributes)}
+    )`
+    )
+    .join(',\n');
+
+  try {
+    await axios.post(CLICKHOUSE_URL, sql + values, {
+      headers: { 'Content-Type': 'text/plain' },
+      timeout: 5000,
+    });
+    console.log(`✓ Inserted ${rows.length} logs into ClickHouse`);
+  } catch (error) {
+    console.error(`✗ Failed to insert logs: ${error.message}`);
+    throw error;
   }
 }
 
@@ -134,16 +162,19 @@ function parseTraceMessage(buffer) {
 async function flushBatches() {
   try {
     if (tracesBatch.length > 0) {
-      await insertTraces(tracesBatch);
+      const batch = tracesBatch;
       tracesBatch = [];
+      await insertTraces(batch);
     }
     if (metricsBatch.length > 0) {
-      console.log(`ℹ Queued ${metricsBatch.length} metrics (not yet implemented)`);
+      const batch = metricsBatch;
       metricsBatch = [];
+      await insertMetrics(batch);
     }
     if (logsBatch.length > 0) {
-      console.log(`ℹ Queued ${logsBatch.length} logs (not yet implemented)`);
+      const batch = logsBatch;
       logsBatch = [];
+      await insertLogs(batch);
     }
   } catch (error) {
     console.error('Error flushing batches:', error.message);
@@ -164,13 +195,28 @@ async function setupConsumer() {
           tracesBatch.push(...spans);
 
           if (tracesBatch.length >= BATCH_SIZE) {
-            await insertTraces(tracesBatch);
+            const batch = tracesBatch;
             tracesBatch = [];
+            await insertTraces(batch);
           }
         } else if (topic === 'otel.metrics') {
-          metricsBatch.push(message.value);
+          const rows = parseMetricsMessage(message.value);
+          metricsBatch.push(...rows);
+
+          if (metricsBatch.length >= BATCH_SIZE) {
+            const batch = metricsBatch;
+            metricsBatch = [];
+            await insertMetrics(batch);
+          }
         } else if (topic === 'otel.logs') {
-          logsBatch.push(message.value);
+          const rows = parseLogsMessage(message.value);
+          logsBatch.push(...rows);
+
+          if (logsBatch.length >= BATCH_SIZE) {
+            const batch = logsBatch;
+            logsBatch = [];
+            await insertLogs(batch);
+          }
         }
       } catch (error) {
         console.error(`Error processing message from ${topic}:`, error.message);

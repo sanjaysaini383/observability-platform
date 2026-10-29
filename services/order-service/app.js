@@ -2,6 +2,7 @@ import express from 'express';
 import { trace } from '@opentelemetry/api';
 import pkg from 'pg';
 import axios from 'axios';
+import { logError } from '../tracing.js';
 
 const { Pool } = pkg;
 const app = express();
@@ -64,6 +65,7 @@ app.post('/orders', async (req, res) => {
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
+        logError('Order creation failed', err);
         res.status(err.response?.status || 500).json({ error: err.message });
     }
 });
@@ -80,6 +82,7 @@ app.put('/orders/:id/pay', async (req, res) => {
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
+        logError('Order status update failed', err);
         res.status(500).json({ error: err.message });
     }
 });

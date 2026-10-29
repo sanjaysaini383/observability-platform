@@ -2,10 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY query-api/package*.json ./
 RUN npm install --omit=dev
 
-COPY index.js .
+COPY query-api/index.js query-api/helpers.js ./
+COPY shared /shared
 
 ENV PORT=4000
 ENV CLICKHOUSE_URL=http://clickhouse:8123

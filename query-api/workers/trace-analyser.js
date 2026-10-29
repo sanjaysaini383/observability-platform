@@ -1,10 +1,14 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import { escSql } from '../../shared/sql-utils.js';
 
 dotenv.config();
 
 const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL || 'http://clickhouse:8123';
 const ANALYSIS_INTERVAL = parseInt(process.env.ANALYSIS_INTERVAL || '60000', 10);
+// Cap retries on traces whose LLM analysis keeps failing (bad prompt, persistent
+// rate limit, etc.) so they don't get re-attempted forever on every poll cycle.
+const MAX_ANALYSIS_ATTEMPTS = parseInt(process.env.ANALYSIS_MAX_ATTEMPTS || '3', 10);
 
 // ── LLM Provider configuration ──────────────────────────────────────────────
 // Set LLM_PROVIDER to "groq", "ollama", or "mock" in your environment.
@@ -17,7 +21,7 @@ const OLLAMA_MODEL = process.env.MODEL || 'tinyllama';
 
 // Groq config (cloud, free tier, zero local storage — needs API key)
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama3-8b-8192';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 console.log(`🧠 LLM Provider: ${LLM_PROVIDER.toUpperCase()}`);
@@ -27,18 +31,30 @@ if (LLM_PROVIDER === 'mock')   console.log(`   Using mock responses (no LLM)`);
 
 // ── ClickHouse helpers ───────────────────────────────────────────────────────
 
+// Ensure CLICKHOUSE_URL always ends with '/' so the HTTP interface works correctly
+const CLICKHOUSE_BASE = CLICKHOUSE_URL.endsWith('/') ? CLICKHOUSE_URL : `${CLICKHOUSE_URL}/`;
+
 async function queryClickHouse(sql) {
   try {
-    const response = await axios.post(
-      `${CLICKHOUSE_URL}?query=${encodeURIComponent(sql)}&format=JSON`,
-      null,
-      { timeout: 5000 }
-    );
+    // POST the SQL as request body with FORMAT appended — the ?query=...&format=
+    // URL-param style was removed in ClickHouse 24.x (matches query-api/index.js).
+    const query = `${sql.trim()} FORMAT JSON`;
+    const response = await axios.post(CLICKHOUSE_BASE, query, {
+      headers: { 'Content-Type': 'text/plain' },
+      timeout: 5000,
+    });
     return response.data.data || [];
   } catch (error) {
     console.error('Error querying ClickHouse:', error.message);
     return [];
   }
+}
+
+async function execClickHouse(sql) {
+  await axios.post(CLICKHOUSE_BASE, sql.trim(), {
+    headers: { 'Content-Type': 'text/plain' },
+    timeout: 5000,
+  });
 }
 
 async function getUnanalysedErrorTraces() {
@@ -63,6 +79,10 @@ async function getUnanalysedErrorTraces() {
     WHERE t.StatusCode = 2
       AND t.StartTime > now() - INTERVAL 5 MINUTE
       AND t.TraceId NOT IN (SELECT TraceId FROM trace_insights)
+      AND t.TraceId NOT IN (
+        SELECT TraceId FROM analysis_attempts
+        GROUP BY TraceId HAVING count() >= ${MAX_ANALYSIS_ATTEMPTS}
+      )
     GROUP BY t.TraceId, t.ServiceName, t.OperationName, t.StartTime, t.StatusMessage
     ORDER BY t.StartTime DESC
     LIMIT 10
@@ -70,9 +90,19 @@ async function getUnanalysedErrorTraces() {
   return queryClickHouse(sql);
 }
 
-async function storeAnalysis(trace, analysis) {
-  const escSql = (v) => String(v ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+async function recordAnalysisAttempt(traceId) {
+  const sql = `
+    INSERT INTO analysis_attempts (TraceId, AttemptedAt)
+    VALUES ('${escSql(traceId)}', now())
+  `;
+  try {
+    await execClickHouse(sql);
+  } catch (error) {
+    console.error('Error recording analysis attempt:', error.message);
+  }
+}
 
+async function storeAnalysis(trace, analysis) {
   const sql = `
     INSERT INTO trace_insights (
       TraceId, ServiceName, OperationName, AnalysedAt,
@@ -90,11 +120,7 @@ async function storeAnalysis(trace, analysis) {
   `;
 
   try {
-    await axios.post(
-      `${CLICKHOUSE_URL}?query=${encodeURIComponent(sql)}`,
-      null,
-      { timeout: 5000 }
-    );
+    await execClickHouse(sql);
     console.log(`✓ Stored analysis for trace ${trace.TraceId}`);
   } catch (error) {
     console.error('Error storing analysis:', error.message);
@@ -247,6 +273,8 @@ async function analyzeErrorTraces() {
       const analysis = await analyzeTraceWithLLM(trace);
       if (analysis) {
         await storeAnalysis(trace, analysis);
+      } else {
+        await recordAnalysisAttempt(trace.TraceId);
       }
       // Throttle — Groq has rate limits; Ollama needs breathing room
       await new Promise((resolve) => setTimeout(resolve, LLM_PROVIDER === 'groq' ? 1000 : 2000));

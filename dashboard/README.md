@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# TraceLens Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React frontend for [TraceLens](../README.md) — a read-only client that polls
+`query-api` every 10–15 seconds and renders traces, the service dependency graph,
+latency/error metrics, and AI-generated root cause insights.
 
-Currently, two official plugins are available:
+Normally you don't run this directly — it's built and served as part of the full stack
+via `docker compose up` from [`infra/`](../infra). See [`../running-guide.md`](../running-guide.md)
+for the full setup.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+React 19 + Vite + TypeScript + TailwindCSS 4 + Recharts (charts) + ReactFlow (service
+graph). No server-side rendering — it's a pure client-side SPA behind `query-api`'s
+REST endpoints.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local development (outside Docker)
 
-## Expanding the ESLint configuration
+Useful for iterating on the UI with hot reload, without rebuilding the container each
+time. Requires `query-api` to already be running (via `docker compose up query-api` or
+the full stack).
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev       # starts Vite dev server, defaults to http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+By default the dev server talks to `http://localhost:4000` for the API. Override with
+a `.env.local` file if `query-api` is running elsewhere:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# dashboard/.env.local
+VITE_API_URL=http://localhost:4000
 ```
+
+## Building
+
+```bash
+npm run build      # outputs to dist/
+npm run preview    # serve the production build locally
+```
+
+The Docker build (`Dockerfile`) runs this same build and serves `dist/` with `serve`.
+
+## Structure
+
+```
+src/
+├── pages/              Dashboard, Traces, Services, Metrics, AiInsights
+├── components/
+│   ├── layout/         Sidebar, Layout (app shell + branding)
+│   └── ui/              Card, Badge, Table, Tabs — shadcn/ui-style primitives
+├── lib/
+│   ├── api.ts           fetch functions + row mappers (ClickHouse PascalCase → camelCase)
+│   └── utils.ts
+└── index.css            Theme tokens (colors, radius) — see project-overview.md for the palette rationale
+```
+
+See [`../project-overview.md`](../project-overview.md) §6 for a walkthrough of what each
+page shows and where its data comes from.

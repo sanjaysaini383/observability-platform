@@ -1,6 +1,7 @@
 import express from 'express';
 import { trace } from '@opentelemetry/api';
 import nodemailer from 'nodemailer';
+import { logError } from '../tracing.js';
 
 const app = express();
 const port = process.env.PORT || 5002;
@@ -52,6 +53,7 @@ app.post('/send', async (req, res) => {
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
+        logError('Notification send failed', err);
         res.status(500).json({ error: err.message });
     }
 });
