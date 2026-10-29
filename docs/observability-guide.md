@@ -16,17 +16,17 @@
 
 ## 📑 Table of Contents
 
-- [What is Observability?](#what-is-observability)
-- [The Three Pillars](#the-three-pillars)
-- [Distributed Tracing Deep Dive](#distributed-tracing-deep-dive)
-- [Metrics & Performance Monitoring](#metrics--performance-monitoring)
-- [Logging & Correlation](#logging--correlation)
-- [Service Dependency Mapping](#service-dependency-mapping)
-- [AI-Powered Root Cause Analysis](#ai-powered-root-cause-analysis)
-- [Using the Dashboard](#using-the-dashboard)
-- [Querying Data Directly](#querying-data-directly)
-- [Best Practices](#best-practices)
-- [Advanced Topics](#advanced-topics)
+- [What is Observability?](#-what-is-observability)
+- [The Three Pillars](#-the-three-pillars)
+- [Distributed Tracing Deep Dive](#-distributed-tracing-deep-dive)
+- [Metrics & Performance Monitoring](#-metrics--performance-monitoring)
+- [Logging & Correlation](#-logging--correlation)
+- [Service Dependency Mapping](#-service-dependency-mapping)
+- [AI-Powered Root Cause Analysis](#-ai-powered-root-cause-analysis)
+- [Using the Dashboard](#-using-the-dashboard)
+- [Querying Data Directly](#-querying-data-directly)
+- [Best Practices](#-best-practices)
+- [Advanced Topics](#-advanced-topics)
 
 ---
 
@@ -154,41 +154,14 @@ The dashboard renders spans as a **waterfall chart** showing:
 
 ### Materialized View Architecture
 
-```sql
--- Pre-aggregation at insert time
-CREATE MATERIALIZED VIEW service_latency_mv
-ENGINE = AggregatingMergeTree()
-ORDER BY (ServiceName, Minute)
-AS SELECT
-  ServiceName,
-  toStartOfMinute(StartTime) AS Minute,
-  quantileState(0.50)(Duration) AS p50_state,
-  quantileState(0.95)(Duration) AS p95_state,
-  quantileState(0.99)(Duration) AS p99_state,
-  countState() AS request_count_state,
-  sumState(if(StatusCode = 2, 1, 0)) AS error_count_state
-FROM traces
-GROUP BY ServiceName, Minute;
+The authoritative schema is defined in [`infra/clickhouse/init.sql`](../infra/clickhouse/init.sql). `service_latency_mv` stores quantile states per service per minute, and `service_latency` merges them at read time.
 
--- Query-time merge
-CREATE VIEW service_latency AS
-SELECT
-  ServiceName,
-  Minute,
-  quantileMerge(0.50)(p50_state) / 1000000 AS p50_ms,
-  quantileMerge(0.95)(p95_state) / 1000000 AS p95_ms,
-  quantileMerge(0.99)(p99_state) / 1000000 AS p99_ms,
-  countMerge(request_count_state) AS total_requests,
-  sumMerge(error_count_state) AS error_count,
-  error_count * 100.0 / total_requests AS error_rate_pct
-FROM service_latency_mv
-GROUP BY ServiceName, Minute;
-```
+Important: the view exposes **`p50_ns`, `p95_ns`, and `p99_ns`** (nanoseconds, matching the raw `Duration` unit), not `*_ms`. Convert at query time, for example `p99_ns / 1000000 AS p99_ms`. It also exposes `total_requests`, `error_count`, and `error_rate_pct`.
 
 **Benefits:**
 - **Performance**: Pre-computed states, merge on read is cheap
 - **Storage**: ~90% reduction vs storing raw spans for dashboards
-- **Accuracy**: Exact quantiles over the aggregated window
+- **Accuracy**: Quantiles over the aggregated window
 - **Real-time**: Updates as new spans arrive
 
 ### Anomaly Detection
@@ -198,13 +171,13 @@ The `/api/alerts` endpoint identifies anomalies:
 ```sql
 SELECT
   ServiceName,
-  MinuteStr,
-  p99_ms,
+  formatDateTime(Minute, '%Y-%m-%d %H:%M:%S') AS MinuteStr,
+  p99_ns / 1000000 AS p99_ms,
   total_requests,
   error_count,
   error_rate_pct,
-  if(error_rate_pct > 10, 'critical', 
-     if(error_rate_pct > 5, 'high', 'medium')) as severity
+  if(error_rate_pct > 10, 'critical',
+     if(error_rate_pct > 5, 'high', 'medium')) AS severity
 FROM service_latency
 WHERE Minute > now() - INTERVAL 1 HOUR
   AND (error_rate_pct > 5 OR p99_ns > 500000000)
@@ -437,7 +410,7 @@ TTL toDateTime(AnalysedAt) + INTERVAL 30 DAY;
 
 ## 🖥️ Using the Dashboard
 
-### Dashboard Home (`/`)
+### Dashboard Home (`/dashboard`)
 
 **KPI Tiles:**
 - Total Requests (last hour)
@@ -502,7 +475,7 @@ TTL toDateTime(AnalysedAt) + INTERVAL 30 DAY;
 - Severity badges (medium/high/critical)
 - Click to investigate
 
-### AI Insights (`/insights`)
+### AI Insights (`/ai-insights`)
 
 **Features:**
 - Full list of all analyses
@@ -577,7 +550,7 @@ SELECT
   sum(if(StatusCode = 2, 1, 0)) as errors,
   errors * 100.0 / requests as error_rate
 FROM traces
-WHERE StartTime > now() - INTERTAGERVAL 1 HOUR
+WHERE StartTime > now() - INTERVAL 1 HOUR
 GROUP BY ServiceName
 ORDER BY p99_ms DESC;
 ```
