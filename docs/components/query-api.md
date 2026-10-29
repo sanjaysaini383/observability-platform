@@ -16,18 +16,18 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [File Structure](#file-structure)
-- [Core Modules](#core-modules)
-- [Caching Strategy](#caching-strategy)
-- [SQL Generation](#sql-generation)
-- [Error Handling](#error-handling)
-- [Configuration](#configuration)
-- [Performance Optimization](#performance-optimization)
-- [Security Considerations](#security-considerations)
-- [Testing](#testing)
-- [Extending the API](#extending-the-api)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [File Structure](#-file-structure)
+- [Core Modules](#-core-modules)
+- [Caching Strategy](#-caching-strategy)
+- [SQL Generation](#-sql-generation)
+- [Error Handling](#-error-handling)
+- [Configuration](#-configuration)
+- [Performance Optimization](#-performance-optimization)
+- [Security Considerations](#-security-considerations)
+- [Testing](#-testing)
+- [Extending the API](#-extending-the-api)
 
 ---
 
@@ -70,13 +70,16 @@ graph LR
 ```
 query-api/
 ├── index.js           # Main application, routes, server setup
-├── helpers.js         # Utility functions (escSql, resolveWindow)
+├── helpers.js         # Re-exports escSql, resolveWindow
 ├── helpers.test.js    # Unit tests for helpers
 ├── package.json       # Dependencies
 ├── Dockerfile         # Container build
 └── workers/
     ├── trace-analyser.js  # AI analysis worker
     └── Dockerfile        # Worker container
+
+shared/
+└── sql-utils.js       # Single source of truth for escSql()
 ```
 
 ---
@@ -105,6 +108,8 @@ app.use(cors());
 const redis = createClient({ url: REDIS_URL });
 await redis.connect();
 ```
+
+> **Note:** Redis is required at startup. `await redis.connect()` runs at module top level, so `query-api` exits instead of starting if Redis is unavailable. There is no graceful fallback to ClickHouse in that state.
 
 #### ClickHouse Query Function
 ```javascript
@@ -154,40 +159,22 @@ async function cachedQuery(key, query, ttl = CACHE_TTL) {
 ```
 
 **Behavior:**
-- Graceful degradation on Redis errors
 - Logs cache hits
 - JSON serialization
-- Configurable TTL
+- Per-route TTLs (the `CACHE_TTL` environment variable is parsed but not used by the cached routes)
+- Does **not** degrade gracefully if Redis is unavailable: startup fails, and after a disconnect node-redis queues commands, so cached routes can hang instead of falling back to ClickHouse
 
 ### helpers.js
 
-Utility functions for query building.
+Utility functions for query building. The authoritative implementations live in [`shared/sql-utils.js`](../../shared/sql-utils.js) and [`query-api/helpers.js`](../../query-api/helpers.js); this page intentionally does not copy them so the docs cannot drift.
 
-#### escSql(str)
-Escapes single quotes for SQL safety.
-
-```javascript
-export function escSql(str) {
-  if (str == null) return '';
-  return String(str).replace(/'/g, "''");
-}
-```
+#### escSql(value)
+Escapes backslashes first, then single quotes, for safe ClickHouse string literals. It stringifies non-string values. See [`shared/sql-utils.js`](../../shared/sql-utils.js).
 
 **Usage:** `where += ` AND ServiceName = '${escSql(service)}'``
 
 #### resolveWindow(window)
-Converts time window string to SQL interval.
-
-```javascript
-export function resolveWindow(window) {
-  switch (window) {
-    case '6h': return '6 HOUR';
-    case '24h': return '24 HOUR';
-    case '1h':
-    default: return '1 HOUR';
-  }
-}
-```
+Converts a window string (`1h`, `6h`, `24h`, `7d`) to a ClickHouse interval and falls back to `1 HOUR` for unknown values. See [`query-api/helpers.js`](../../query-api/helpers.js).
 
 ---
 
@@ -196,13 +183,14 @@ export function resolveWindow(window) {
 ### Cache Keys
 | Key Pattern | TTL | Purpose |
 |:------------|:----|:---------|
-| `trace:{traceId}` | 300s (5 min) | Individual trace details |
-| `services:graph` | 30s | Service dependency graph |
+| `trace:{traceId}` | 300s (5 min, hard-coded) | Individual trace details |
+| `services:graph` | 30s (hard-coded) | Service dependency graph |
 
 ### Cache Behavior
 - **Cache-Aside Pattern**: Check cache first, query on miss
 - **TTL-based Expiration**: Automatic expiry
-- **Graceful Degradation**: Continue without cache if Redis fails
+- **Fixed TTLs**: Both cached routes pass literal TTLs, so `CACHE_TTL` currently has no effect
+- **Redis Required**: The API does not start if Redis is down, and queued commands can hang cached routes after a disconnect
 - **JSON Serialization**: Store parsed ClickHouse results
 
 ### When to Cache
@@ -317,7 +305,7 @@ Routes catch and return 503:
 ```
 
 ### Redis Errors
-Gracefully handled with try/catch, logging warnings, continuing without cache.
+The try/catch blocks only catch errors that surface; they do not provide graceful degradation. Because `await redis.connect()` runs at startup, the process will not start without Redis. After a disconnect, node-redis queues commands by default, so cached routes may hang rather than fall through to ClickHouse. Configure a connect timeout / disable the offline queue if you need fail-fast behavior.
 
 ### Validation
 - Limit capped at 1000 for traces, 100 for error traces
@@ -331,26 +319,14 @@ Gracefully handled with try/catch, logging warnings, continuing without cache.
 ### Environment Variables
 ```bash
 PORT=4000
-CLICKHOUSE_URL=http://clickhouse:8123
+CLICKHOUSE_URL=http://default:password@clickhouse:8123
 REDIS_URL=redis://redis:6379
+# Parsed but currently unused: cached routes pass hard-coded TTLs (300s / 30s).
 CACHE_TTL=30
 ```
 
 ### Dependencies
-```json
-{
-  "dependencies": {
-    "express": "^4.18.2",
-    "axios": "^1.6.0",
-    "redis": "^4.6.10",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  }
-}
-```
+See [`query-api/package.json`](../../query-api/package.json) for the authoritative dependency list and versions.
 
 ---
 
@@ -399,25 +375,28 @@ CACHE_TTL=30
 ## 🧪 Testing
 
 ### Unit Tests
-`helpers.test.js` tests utility functions:
+`helpers.test.js` tests utility functions. These expectations match the shared helper:
 
 ```javascript
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { escSql, resolveWindow } from './helpers.js';
 
-test('escSql escapes single quotes', () => {
-  assert.strictEqual(escSql("it's fine"), "it''s fine");
+test('escSql escapes single quotes and backslashes', () => {
+  assert.strictEqual(escSql("O'Reilly"), "O\\'Reilly");
+  assert.strictEqual(escSql('\\'), '\\\\');
 });
 
-test('escSql returns empty string for null', () => {
-  assert.strictEqual(escSql(null), '');
+test('escSql stringifies non-string values', () => {
+  assert.strictEqual(escSql(42), '42');
+  assert.strictEqual(escSql(null), 'null');
 });
 
 test('resolveWindow returns correct intervals', () => {
   assert.strictEqual(resolveWindow('1h'), '1 HOUR');
   assert.strictEqual(resolveWindow('6h'), '6 HOUR');
   assert.strictEqual(resolveWindow('24h'), '24 HOUR');
+  assert.strictEqual(resolveWindow('7d'), '7 DAY');
 });
 ```
 
@@ -484,6 +463,6 @@ export function customHelper(param) {
 
 <div align="center">
 
-**[← Back to API Reference](./query-api-reference.md)** | **[Kafka Consumer Guide →](./kafka-consumer.md)**
+**[← Back to API Reference](../api/query-api-reference.md)** | **[Architecture Guide →](../architecture.md)**
 
 </div>
