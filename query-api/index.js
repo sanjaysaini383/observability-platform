@@ -13,11 +13,17 @@ const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL || 'http://clickhouse:8123';
 const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379';
 const CACHE_TTL = parseInt(process.env.CACHE_TTL || '30', 10);
 
-// Redis client
-const redis = createClient({ url: REDIS_URL });
-redis.on('error', (err) => console.log('Redis Client Error', err));
-redis.on('connect', () => console.log('✓ Redis connected'));
-await redis.connect();
+// Redis client — the cache is best-effort. Startup doesn't wait for Redis, and
+// while it's down commands fail fast instead of queueing, so requests fall
+// through to ClickHouse. Reconnects back off to one attempt every 5s.
+const redis = createClient({
+  url: REDIS_URL,
+  disableOfflineQueue: true,
+  socket: { reconnectStrategy: (retries) => Math.min(retries * 500, 5000) },
+});
+redis.on('error', (err) => console.log('Redis Client Error', err.message));
+redis.on('ready', () => console.log('✓ Redis connected'));
+redis.connect().catch((err) => console.warn('Redis connect failed:', err.message));
 
 // Middleware
 app.use(express.json());
@@ -61,22 +67,26 @@ async function queryClickHouse(sql, format = 'JSON') {
  * Helper: Get from cache or execute query
  */
 async function cachedQuery(key, query, ttl = CACHE_TTL) {
-  try {
-    const cached = await redis.get(key);
-    if (cached) {
-      console.log(`✓ Cache hit: ${key}`);
-      return JSON.parse(cached);
+  if (redis.isReady) {
+    try {
+      const cached = await redis.get(key);
+      if (cached) {
+        console.log(`✓ Cache hit: ${key}`);
+        return JSON.parse(cached);
+      }
+    } catch (err) {
+      console.warn('Redis get error:', err.message);
     }
-  } catch (err) {
-    console.warn('Redis get error:', err.message);
   }
 
   try {
     const result = await queryClickHouse(query);
-    try {
-      await redis.setEx(key, ttl, JSON.stringify(result));
-    } catch (err) {
-      console.warn('Redis set error:', err.message);
+    if (redis.isReady) {
+      try {
+        await redis.setEx(key, ttl, JSON.stringify(result));
+      } catch (err) {
+        console.warn('Redis set error:', err.message);
+      }
     }
     return result;
   } catch (error) {
