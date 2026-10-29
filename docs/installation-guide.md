@@ -16,14 +16,14 @@
 
 ## 📑 Table of Contents
 
-- [System Requirements](#system-requirements)
-- [Pre-Installation Checklist](#pre-installation-checklist)
-- [Installation Methods](#installation-methods)
-- [Step-by-Step Installation](#step-by-step-installation)
-- [Post-Installation Setup](#post-installation-setup)
-- [Verification](#verification)
-- [Troubleshooting Installation](#troubleshooting-installation)
-- [Next Steps](#next-steps)
+- [System Requirements](#-system-requirements)
+- [Pre-Installation Checklist](#-pre-installation-checklist)
+- [Installation Methods](#-installation-methods)
+- [Step-by-Step Installation](#-step-by-step-installation)
+- [Post-Installation Setup](#-post-installation-setup)
+- [Verification](#-verification)
+- [Troubleshooting Installation](#-troubleshooting-installation)
+- [Next Steps](#-next-steps)
 
 ---
 
