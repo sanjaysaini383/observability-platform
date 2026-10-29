@@ -16,18 +16,18 @@
 
 ## 📑 Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
-- [How Can I Contribute?](#how-can-i-contribute)
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [Coding Standards](#coding-standards)
-- [Project Structure](#project-structure)
-- [Testing Guidelines](#testing-guidelines)
-- [Pull Request Process](#pull-request-process)
-- [Commit Message Guidelines](#commit-message-guidelines)
-- [Issue Reporting](#issue-reporting)
-- [Areas Needing Help](#areas-needing-help)
-- [Recognition](#recognition)
+- [Code of Conduct](#-code-of-conduct)
+- [How Can I Contribute?](#-how-can-i-contribute)
+- [Getting Started](#-getting-started)
+- [Development Workflow](#-development-workflow)
+- [Coding Standards](#-coding-standards)
+- [Project Structure](#-project-structure)
+- [Testing Guidelines](#-testing-guidelines)
+- [Pull Request Process](#-pull-request-process)
+- [Commit Message Guidelines](#-commit-message-guidelines)
+- [Issue Reporting](#-issue-reporting)
+- [Areas Needing Help](#-areas-needing-help)
+- [Recognition](#-recognition)
 
 ---
 
@@ -214,18 +214,14 @@ Open a PR from your fork to the main repository with a clear description.
 - Keep functions small and focused
 - Add JSDoc for complex functions
 
-**Example:**
+**SQL escaping example:**
+Do not copy an escaping implementation into a service. Use the shared helper, which is the single source of truth:
+
 ```javascript
-/**
- * Escape SQL string values to prevent injection
- * @param {string} str - Input string
- * @returns {string} Escaped string
- */
-export function escSql(str) {
-  if (str == null) return '';
-  return String(str).replace(/'/g, "''");
-}
+import { escSql } from '../shared/sql-utils.js';
 ```
+
+It escapes backslashes **before** single quotes. A naïve `replace(/'/g, "''")` is injectable in ClickHouse through a trailing backslash (for example `from='\', to=' OR 1=1 --'`). See [`shared/sql-utils.js`](../shared/sql-utils.js) for the implementation.
 
 ### TypeScript (Dashboard)
 - Use strict type checking
@@ -244,7 +240,7 @@ interface Trace {
 ```
 
 ### SQL (ClickHouse)
-- Use parameterized-style escaping (we use `escSql`)
+- Use the shared `escSql` from [`shared/sql-utils.js`](../shared/sql-utils.js)
 - Format queries for readability
 - Use appropriate data types
 - Add comments for complex queries
@@ -323,13 +319,15 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { escSql } from './helpers.js';
 
-test('escSql escapes single quotes', () => {
-  assert.strictEqual(escSql("O'Reilly"), "O''Reilly");
+test('escSql escapes single quotes and backslashes', () => {
+  assert.strictEqual(escSql("O'Reilly"), "O\\'Reilly");
+  assert.strictEqual(escSql('\\'), '\\\\');
 });
 
-test('escSql handles null/undefined', () => {
-  assert.strictEqual(escSql(null), '');
-  assert.strictEqual(escSql(undefined), '');
+test('escSql stringifies non-string values', () => {
+  assert.strictEqual(escSql(42), '42');
+  assert.strictEqual(escSql(null), 'null');
+  assert.strictEqual(escSql(undefined), 'undefined');
 });
 ```
 
