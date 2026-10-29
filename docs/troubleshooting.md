@@ -15,17 +15,17 @@
 
 ## 📑 Table of Contents
 
-- [Quick Diagnostics](#quick-diagnostics)
-- [Installation Issues](#installation-issues)
-- [Container & Networking Issues](#container--networking-issues)
-- [Data Pipeline Issues](#data-pipeline-issues)
-- [Dashboard & API Issues](#dashboard--api-issues)
-- [AI Analysis Issues](#ai-analysis-issues)
-- [Performance Issues](#performance-issues)
-- [Database Issues](#database-issues)
-- [Logging & Debugging](#logging--debugging)
-- [Emergency Recovery](#emergency-recovery)
-- [Getting Help](#getting-help)
+- [Quick Diagnostics](#-quick-diagnostics)
+- [Installation Issues](#-installation-issues)
+- [Container & Networking Issues](#-container--networking-issues)
+- [Data Pipeline Issues](#-data-pipeline-issues)
+- [Dashboard & API Issues](#-dashboard--api-issues)
+- [AI Analysis Issues](#-ai-analysis-issues)
+- [Performance Issues](#-performance-issues)
+- [Database Issues](#-database-issues)
+- [Logging & Debugging](#-logging--debugging)
+- [Emergency Recovery](#-emergency-recovery)
+- [Getting Help](#-getting-help)
 
 ---
 
@@ -231,8 +231,9 @@ docker compose exec clickhouse clickhouse-client --user default --password passw
 
 1. **Generate traffic** (most common cause):
 ```bash
-curl http://localhost:5000/init
-curl http://localhost:5001/init
+# /init is POST-only; a GET returns 404.
+curl -X POST http://localhost:5000/init
+curl -X POST http://localhost:5001/init
 bash load-gen.sh
 ```
 
@@ -301,10 +302,10 @@ curl http://localhost:8123/ping
 ### Issue: Data Loss or Duplicates
 
 **Understanding:**
-- At-least-once delivery means possible duplicates
-- Handled by `TraceId + SpanId` uniqueness in queries (not enforced as PK)
-
-**Not a bug** - acceptable for observability use case.
+- There is **no at-least-once guarantee**: the consumer auto-commits offsets (default per-message) and buffers spans in memory before inserting into ClickHouse.
+- A ClickHouse insert failure or a consumer restart drops the in-memory batch, and those spans are lost.
+- Duplicates are also possible if the process dies after inserting but before the offset commit. There is **no** `TraceId + SpanId` deduplication or uniqueness constraint. Queries return whatever is stored.
+- This is a known limitation of the current pipeline, not a guarantee you can rely on. See [`kafka-consumer/index.js`](../kafka-consumer/index.js).
 
 ---
 
@@ -512,6 +513,8 @@ TRUNCATE TABLE analysis_attempts;
 docker compose exec clickhouse clickhouse-client --user default --password password --query "TRUNCATE TABLE analysis_attempts"
 ```
 
+> Clearing attempts only helps if the trace is still inside the analyser's lookback window (the last **5 minutes**). Older traces will not be picked up again even after the retry counter is cleared.
+
 ---
 
 ## ⚡ Performance Issues
@@ -610,8 +613,8 @@ docker compose exec redis redis-cli ping
 
 **Solutions:**
 1. Restart Redis: `docker compose restart redis`
-2. Check REDIS_URL
-3. API continues without cache on error (graceful degradation)
+2. Check `REDIS_URL`
+3. Expect `query-api` to fail at startup if Redis was never reachable. After a disconnect, node-redis queues commands, so cached requests may hang instead of falling back to ClickHouse. Fix Redis rather than relying on graceful degradation.
 4. Clear Redis: `docker compose exec redis redis-cli FLUSHALL`
 
 ### Issue: ClickHouse Table Doesn't Exist
@@ -731,7 +734,7 @@ curl -X POST http://localhost:5001/init
 **Reset just data pipeline:**
 ```bash
 docker compose stop kafka-consumer trace-analyser
-docker compose exec clickhouse clickhouse-client --user default --password password --query "TRUNCATE TABLE traces; TRUNCATE TABLE metrics; TRUNCATE TABLE logs; TRUNCATE TABLE trace_insights;"
+docker compose exec clickhouse clickhouse-client --user default --password password --query "TRUNCATE TABLE traces; TRUNCATE TABLE metrics; TRUNCATE TABLE logs; TRUNCATE TABLE trace_insights; TRUNCATE TABLE service_latency_mv; TRUNCATE TABLE analysis_attempts;"
 docker compose start kafka-consumer trace-analyser
 ```
 
