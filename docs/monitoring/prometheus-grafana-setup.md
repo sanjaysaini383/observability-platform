@@ -15,18 +15,18 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installing Prometheus](#installing-prometheus)
-- [Installing Grafana](#installing-grafana)
-- [Configuring Node Exporter](#configuring-node-exporter)
-- [Configuring cAdvisor](#configuring-cadvisor)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Prerequisites](#-prerequisites)
+- [Installing Prometheus](#-installing-prometheus)
 - [Prometheus Configuration](#prometheus-configuration)
-- [Grafana Dashboards](#grafana-dashboards)
-- [Alerting Rules](#alerting-rules)
-- [Docker Compose Integration](#docker-compose-integration)
-- [Troubleshooting](#troubleshooting)
+- [Installing Grafana](#-installing-grafana)
+- [Configuring Node Exporter](#-configuring-node-exporter)
+- [Configuring cAdvisor](#-configuring-cadvisor)
+- [Grafana Dashboards](#-grafana-dashboards)
+- [Alerting Rules](#-alerting-rules)
+- [Docker Compose Integration](#-docker-compose-integration)
+- [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -55,7 +55,7 @@ graph LR
 
 - TraceLens stack running
 - Additional resources (1-2GB RAM recommended)
-- Ports 9090 (Prometheus), 3001 (Grafana), 9100 (Node Exporter), 8080 (cAdvisor) available
+- Ports 9090 (Prometheus), 3002 (Grafana), 9100 (Node Exporter), 8081 (cAdvisor) available. Avoid `3001` (payment-service) and `8080` (dashboard).
 
 ---
 
@@ -70,6 +70,8 @@ docker run -d \
   -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
   prom/prometheus:latest
 ```
+
+## Prometheus Configuration
 
 ### Configuration File (`prometheus.yml`)
 
@@ -99,14 +101,9 @@ scrape_configs:
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['cadvisor:8080']
-
-  - job_name: 'tracelens-services'
-    static_configs:
-      - targets: 
-        - 'api-gateway:3000'
-        - 'query-api:4000'
-        - 'order-service:5000'
 ```
+
+> Application services (`api-gateway`, `query-api`, `order-service`, etc.) push OTLP to the collector and do **not** expose a `/metrics` endpoint. Do not add them as Prometheus scrape targets unless you add a Prometheus exporter; otherwise those targets stay down and trigger false alerts.
 
 ---
 
@@ -117,14 +114,14 @@ scrape_configs:
 ```bash
 docker run -d \
   --name grafana \
-  -p 3001:3000 \
+  -p 3002:3000 \
   -e "GF_SECURITY_ADMIN_PASSWORD=admin" \
   -v grafana-data:/var/lib/grafana \
   grafana/grafana:latest
 ```
 
 ### Initial Setup
-1. Access `http://localhost:3001`
+1. Access `http://localhost:3002`
 2. Login with admin/admin
 3. Change password
 4. Add Prometheus as data source: `http://prometheus:9090`
@@ -198,15 +195,6 @@ groups:
   - name: tracelens_alerts
     interval: 30s
     rules:
-      - alert: ServiceDown
-        expr: up == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Service {{ $labels.job }} is down"
-          description: "{{ $labels.instance }} has been down for more than 1 minute."
-
       - alert: HighMemoryUsage
         expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
         for: 5m
@@ -256,7 +244,7 @@ Add to `infra/docker-compose.yml`:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3001:3000"
+      - "3002:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
@@ -314,6 +302,6 @@ volumes:
 
 <div align="center">
 
-**[← Back to Monitoring](./monitoring-operations.md)** | **[Alerts Guide →](./alerts-and-notifications.md)**
+**[← Back to Monitoring](./monitoring-operations.md)** | **[Troubleshooting →](../troubleshooting.md)**
 
 </div>
