@@ -15,17 +15,17 @@
 
 ## 📑 Table of Contents
 
-- [Deployment Options](#deployment-options)
-- [Pre-Deployment Checklist](#pre-deployment-checklist)
-- [Docker Compose (Single Server)](#docker-compose-single-server)
-- [Docker Swarm](#docker-swarm)
-- [Kubernetes](#kubernetes)
-- [Cloud Deployments](#cloud-deployments)
-- [Reverse Proxy & TLS](#reverse-proxy--tls)
-- [Monitoring & Logging](#monitoring--logging)
-- [Backup & Recovery](#backup--recovery)
-- [Scaling Strategies](#scaling-strategies)
-- [Post-Deployment](#post-deployment)
+- [Deployment Options](#-deployment-options)
+- [Pre-Deployment Checklist](#-pre-deployment-checklist)
+- [Docker Compose (Single Server)](#-docker-compose-single-server)
+- [Docker Swarm](#-docker-swarm)
+- [Kubernetes](#-kubernetes)
+- [Cloud Deployments](#-cloud-deployments)
+- [Reverse Proxy & TLS](#-reverse-proxy--tls)
+- [Monitoring & Logging](#-monitoring--logging)
+- [Backup & Recovery](#-backup--recovery)
+- [Scaling Strategies](#-scaling-strategies)
+- [Post-Deployment](#-post-deployment)
 
 ---
 
@@ -125,7 +125,8 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/observability-platform/infra
 ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down
+# Use stop, not down: orders/inventory have no named volume and `down` deletes PostgreSQL data.
+ExecStop=/usr/bin/docker compose stop
 TimeoutStartSec=0
 
 [Install]
@@ -270,6 +271,10 @@ upstream api {
     server localhost:4000;
 }
 
+upstream api_gateway {
+    server localhost:3000;
+}
+
 server {
     listen 443 ssl http2;
     server_name yourdomain.com;
@@ -288,6 +293,19 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
+
+    # Query API health lives at /health, not /api/health.
+    location = /health {
+        proxy_pass http://api/health;
+        proxy_set_header Host $host;
+    }
+
+    # Checkout (and other storefront routes) belong to api-gateway, not query-api.
+    location /checkout {
+        proxy_pass http://api_gateway;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 ```
 
@@ -295,9 +313,37 @@ server {
 ```caddyfile
 yourdomain.com {
     reverse_proxy /api/* localhost:4000
+    reverse_proxy /health localhost:4000
+    reverse_proxy /checkout localhost:3000
     reverse_proxy localhost:8080
 }
 ```
+
+### Build the Dashboard for Production
+`dashboard/src/lib/api.ts` appends `/api` to `VITE_API_URL`, so set it to the public **origin only** (no `/api`, no port):
+
+```bash
+cd dashboard
+VITE_API_URL=https://yourdomain.com npm run build
+```
+
+Or update the `dashboard` build args in `infra/docker-compose.yml` and rebuild:
+
+```yaml
+dashboard:
+  build:
+    context: ../dashboard
+    args:
+      VITE_API_URL: https://yourdomain.com
+```
+
+```bash
+cd infra
+docker compose build dashboard
+docker compose up -d dashboard
+```
+
+The default `http://localhost:4000` is only correct when the browser runs on the same machine as the stack.
 
 ### Certbot
 ```bash
@@ -393,11 +439,17 @@ docker run --rm \
 docker compose ps
 
 # Test endpoints
-curl https://yourdomain.com/api/health
+curl https://yourdomain.com/health
 curl https://yourdomain.com
 
-# Generate test traffic
-curl -X POST https://yourdomain.com/api/checkout
+# Seed demo data (POST only; a GET returns 404)
+curl -X POST http://localhost:5000/init
+curl -X POST http://localhost:5001/init
+
+# Generate test traffic through the proxy
+curl -X POST https://yourdomain.com/checkout \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"productId":1,"qty":1}]}'
 ```
 
 ### Monitoring Setup
@@ -418,6 +470,6 @@ curl -X POST https://yourdomain.com/api/checkout
 
 <div align="center">
 
-**[← Back to Docs](../README.md)** | **[Local Development →](../development/local-development.md)**
+**[← Back to Docs](../../README.md)** | **[Local Development →](../development/local-development.md)**
 
 </div>
