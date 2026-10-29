@@ -16,17 +16,17 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Design Philosophy](#design-philosophy)
-- [System Architecture](#system-architecture)
-- [Five-Layer Architecture](#five-layer-architecture)
-- [Data Flow Deep Dive](#data-flow-deep-dive)
-- [Component Architecture](#component-architecture)
-- [Technology Stack](#technology-stack)
-- [Scalability & Reliability](#scalability--reliability)
-- [Security Considerations](#security-considerations)
-- [Design Patterns Used](#design-patterns-used)
-- [References](#references)
+- [Overview](#-overview)
+- [Design Philosophy](#-design-philosophy)
+- [System Architecture](#-system-architecture)
+- [Five-Layer Architecture](#-five-layer-architecture)
+- [Data Flow Deep Dive](#-data-flow-deep-dive)
+- [Component Architecture](#-component-architecture)
+- [Technology Stack](#-technology-stack)
+- [Scalability & Reliability](#-scalability--reliability)
+- [Security Considerations](#-security-considerations)
+- [Design Patterns Used](#-design-patterns-used)
+- [References](#-references)
 
 ---
 
@@ -45,7 +45,7 @@ The platform demonstrates real-world distributed systems engineering challenges 
 | **Separation of Concerns** | Five distinct planes (App, Ingestion, Buffer, Storage, Control) | Each component has single responsibility, independently scalable |
 | **Loose Coupling** | Kafka as intermediary between collector and storage | Application performance isolated from telemetry pipeline failures |
 | **Asynchronous by Default** | Fire-and-forget OTLP exports, background AI analysis | Zero impact on request latency from observability overhead |
-| **Fail-Safe Design** | Memory limits, health checks, retry logic, graceful degradation | System remains resilient under failure conditions |
+| **Fail-Safe Design** | Memory limits, health checks, retry logic | Bounds resource use; note that `query-api` still requires Redis at startup |
 | **Observability of Observability** | All components instrumented with OpenTelemetry | Platform can trace its own behavior |
 | **Open Standards** | W3C Trace Context, OpenTelemetry protocols | Vendor-neutral, future-proof architecture |
 
@@ -176,7 +176,7 @@ Provides **durable, decoupled message queuing**.
 - `otel.metrics` - Time-series metrics
 - `otel.logs` - Structured log records
 
-**Design Rationale:** Kafka acts as a shock absorber during traffic spikes, outages, or ClickHouse slowdowns. Telemetry is never dropped, and application performance is completely isolated from storage backend health.
+**Design Rationale:** Kafka acts as a shock absorber during traffic spikes, outages, or ClickHouse slowdowns, and application performance is isolated from storage backend health. It does **not** currently guarantee delivery: the consumer auto-commits offsets and discards a batch if the ClickHouse insert fails (see [Reliability Patterns](#reliability-patterns)).
 
 ### Layer 4: Processing & Storage Plane
 Handles **data transformation, persistence, and optimization**.
@@ -368,7 +368,7 @@ async function cachedQuery(key, query, ttl = 30) {
 
 | Category | Technology | Version | Purpose |
 |:-----------|:------------|:---------|:--------|
-| **Language (Backend)** | Node.js | 18+ | Services, API, Consumer |
+| **Language (Backend)** | Node.js | 20.19+ | Services, API, Consumer; dashboard tooling (Vite 8 / ESLint 10) requires 20.19+ |
 | **Language (Frontend)** | TypeScript + React | 19 + 18 | Dashboard UI |
 | **Framework (API)** | Express.js | 4.x | REST APIs |
 | **Tracing** | OpenTelemetry | Latest | Instrumentation & propagation |
@@ -408,7 +408,7 @@ async function cachedQuery(key, query, ttl = 30) {
 | **Retry with Backoff** | Kafka exporter retry config | Handles transient failures |
 | **Health Checks** | Docker healthchecks on all critical services | Orchestration awareness |
 | **Graceful Shutdown** | SIGINT/SIGTERM handlers | Clean resource cleanup |
-| **At-Least-Once Delivery** | Kafka offset commit after insert | No data loss |
+| **No Delivery Guarantee (known limitation)** | Offsets auto-commit per message; in-memory batches are dropped if the ClickHouse insert fails | Data can be lost on a ClickHouse blip or consumer restart, duplicates are possible, and there is no `TraceId`+`SpanId` deduplication |
 
 ### Performance Characteristics
 
@@ -436,7 +436,7 @@ async function cachedQuery(key, query, ttl = 30) {
 | **Dashboard** | None | Publicly accessible if exposed |
 | **ClickHouse** | Basic | Username/password in docker-compose |
 | **Secrets** | Env vars | Loaded from `.env`, gitignored |
-| **SQL Injection** | Mitigated | All inputs escaped via `escSql()` |
+| **SQL Injection** | Mitigated | Inputs escaped via the shared [`escSql()`](../shared/sql-utils.js) helper |
 | **Network** | Isolated | Bridge network for internal comms |
 
 ### Production Hardening Recommendations
