@@ -667,7 +667,7 @@ Contributions are welcome — especially on tail-based sampling, the alerting en
 
 ## 📄 License
 
-MIT — use it, fork it, learn from it, put it on your resume.
+[MIT](./LICENSE) — use it, fork it, learn from it, put it on your resume.
 
 ---
 
