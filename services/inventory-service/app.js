@@ -73,24 +73,39 @@ app.post('/reserve', async (req, res) => {
             throw new Error('Inventory database timeout - simulated error');
         }
 
-        // Simple transaction (for demo purposes)
-        await pool.query('BEGIN');
-        for (const item of items) {
-            const { rows } = await pool.query('SELECT price, stock FROM products WHERE id = $1 FOR UPDATE', [item.productId]);
-            if (rows.length === 0) throw new Error(`Product ${item.productId} not found`);
-            if (rows[0].stock < item.qty) throw new Error(`Insufficient stock for product ${item.productId}`);
-            
-            total += parseFloat(rows[0].price) * item.qty;
-            await pool.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [item.qty, item.productId]);
+        // All transaction statements must run on one checked-out client;
+        // pool.query() may use a different connection for each call.
+        const client = await pool.connect();
+        let releaseErr;
+        try {
+            await client.query('BEGIN');
+            const ordered = [...items].sort((a, b) => Number(a.productId) - Number(b.productId));
+            for (const item of ordered) {
+                const { rows } = await client.query('SELECT price, stock FROM products WHERE id = $1 FOR UPDATE', [item.productId]);
+                if (rows.length === 0) throw new Error(`Product ${item.productId} not found`);
+                if (rows[0].stock < item.qty) throw new Error(`Insufficient stock for product ${item.productId}`);
+
+                total += parseFloat(rows[0].price) * item.qty;
+                await client.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [item.qty, item.productId]);
+            }
+            await client.query('COMMIT');
+        } catch (err) {
+            try {
+                await client.query('ROLLBACK');
+            } catch (rollbackErr) {
+                // Don't return a connection in an unknown transaction state to the pool
+                releaseErr = rollbackErr;
+            }
+            throw err;
+        } finally {
+            client.release(releaseErr);
         }
-        await pool.query('COMMIT');
 
         span.setAttributes({ 'inventory.items_count': items.length, 'inventory.total': total });
         span.setStatus({ code: 0 });
         span.end();
         res.json({ success: true, total });
     } catch (err) {
-        await pool.query('ROLLBACK');
         span.recordException(err);
         span.setStatus({ code: 2 });
         span.end();
