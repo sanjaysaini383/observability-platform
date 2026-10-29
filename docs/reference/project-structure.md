@@ -15,17 +15,17 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Root Directory](#root-directory)
-- [collector/](#collector)
-- [dashboard/](#dashboard)
-- [docs/](#docs)
-- [infra/](#infra)
-- [kafka-consumer/](#kafka-consumer)
-- [query-api/](#query-api)
-- [services/](#services)
-- [shared/](#shared)
-- [File Statistics](#file-statistics)
+- [Overview](#-overview)
+- [Root Directory](#-root-directory)
+- [collector/](#-collector)
+- [dashboard/](#-dashboard)
+- [docs/](#-docs)
+- [infra/](#-infra)
+- [kafka-consumer/](#-kafka-consumer)
+- [query-api/](#-query-api)
+- [services/](#-services)
+- [shared/](#-shared)
+- [File Statistics](#-file-statistics)
 
 ---
 
@@ -356,4 +356,4 @@ shared/
 
 <div align="center">
 
-**[← Back to Docs](../README.md)** | **[API Reference →](../api/query-api-reference.md)**</div>
+**[← Back to Docs](../../README.md)** | **[API Reference →](../api/query-api-reference.md)**</div>
