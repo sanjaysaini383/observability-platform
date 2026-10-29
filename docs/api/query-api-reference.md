@@ -15,15 +15,15 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Base URL](#base-url)
-- [Authentication](#authentication)
-- [Response Format](#response-format)
-- [Error Handling](#error-handling)
-- [Endpoints](#endpoints)
-- [Rate Limiting](#rate-limiting)
-- [Examples](#examples)
-- [SDK Usage](#sdk-usage)
+- [Overview](#-overview)
+- [Base URL](#-base-url)
+- [Authentication](#-authentication)
+- [Response Format](#-response-format)
+- [Error Handling](#-error-handling)
+- [Endpoints](#-endpoints)
+- [Rate Limiting](#-rate-limiting)
+- [Examples](#-examples)
+- [SDK Usage](#-sdk-usage)
 
 ---
 
@@ -35,7 +35,7 @@ The Query API serves as the data access layer for TraceLens, providing RESTful e
 - **Port:** 4000
 - **Framework:** Express.js
 - **Data Sources:** ClickHouse (primary), Redis (cache)
-- **Caching:** Redis with configurable TTL
+- **Caching:** Redis with per-route TTLs (5 min trace detail, 30s service graph)
 
 ---
 
@@ -118,9 +118,11 @@ List recent traces with optional filtering.
 |:-----------|:------|:---------|:---------|:-------------|
 | `service` | string | No | - | Filter by service name |
 | `status` | string | No | - | Filter by status: `ok` or `error` |
-| `from` | string | No | - | Start time (ISO format) |
-| `to` | string | No | - | End time (ISO format) |
+| `from` | string | No* | - | Start time, `YYYY-MM-DD HH:MM:SS` (UTC) |
+| `to` | string | No* | - | End time, `YYYY-MM-DD HH:MM:SS` (UTC) |
 | `limit` | integer | No | 100 | Max results (max 1000) |
+
+> **Both `from` and `to` are required together.** They are only applied when both are present. The values are compared as raw strings against `DateTime64`, so use UTC in `YYYY-MM-DD HH:MM:SS` form. ISO-8601 values such as `2026-10-28T10:00:00.000Z` (what `toISOString()` returns) can fail to parse and cause a `503`.
 
 **Response:**
 ```json
@@ -231,7 +233,7 @@ Get latency and error rate metrics per service.
 | Parameter | Type | Required | Default | Description |
 |:-----------|:------|:---------|:---------|:-------------|
 | `service` | string | No | - | Filter by service name |
-| `window` | string | No | `1h` | Time window: `1h`, `6h`, `24h` |
+| `window` | string | No | `1h` | Time window: `1h`, `6h`, `24h`, `7d` (unknown values fall back to `1h`) |
 
 **Response:**
 ```json
@@ -252,7 +254,7 @@ Get latency and error rate metrics per service.
 }
 ```
 
-**Data Source:** `service_latency` materialized view
+**Data Source:** `service_latency` view (over `service_latency_mv`); latency columns are nanoseconds in the view and converted to milliseconds by the API
 
 **Example:**
 ```bash
@@ -287,7 +289,7 @@ Get active anomalies (high error rate or latency).
 **Alert Criteria:**
 - Error rate > 5% OR P99 latency > 500ms
 - Time window: Last 1 hour
-- Severity: `medium` (>5% error), `high` (>5%), `critical` (>10% error)
+- Severity: `critical` (>10% error), `high` (>5% and ≤10% error), `medium` (≤5% error, e.g. the latency-only case where P99 > 500ms but error rate is ≤5%)
 
 **Example:**
 ```bash
@@ -480,6 +482,6 @@ traces = get_traces(status='error', limit=10)
 
 <div align="center">
 
-**[← Back to Docs Index](../README.md)** | **[Components Guide →](../components/query-api.md)**
+**[← Back to Docs Index](../../README.md)** | **[Components Guide →](../components/query-api.md)**
 
 </div>
