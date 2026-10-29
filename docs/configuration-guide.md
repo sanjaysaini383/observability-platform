@@ -16,17 +16,17 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#overview)
-- [Environment Variables](#environment-variables)
-- [Docker Compose Configuration](#docker-compose-configuration)
-- [OpenTelemetry Collector Configuration](#opentelemetry-collector-configuration)
-- [ClickHouse Configuration](#clickhouse-configuration)
-- [Kafka Configuration](#kafka-configuration)
-- [Service-Specific Configuration](#service-specific-configuration)
-- [AI/LLM Configuration](#aillm-configuration)
-- [Dashboard Configuration](#dashboard-configuration)
-- [Advanced Tuning](#advanced-tuning)
-- [Configuration Best Practices](#configuration-best-practices)
+- [Overview](#-overview)
+- [Environment Variables](#-environment-variables)
+- [Docker Compose Configuration](#-docker-compose-configuration)
+- [OpenTelemetry Collector Configuration](#-opentelemetry-collector-configuration)
+- [ClickHouse Configuration](#-clickhouse-configuration)
+- [Kafka Configuration](#-kafka-configuration)
+- [Service-Specific Configuration](#-service-specific-configuration)
+- [AI/LLM Configuration](#-aillm-configuration)
+- [Dashboard Configuration](#-dashboard-configuration)
+- [Advanced Tuning](#-advanced-tuning)
+- [Configuration Best Practices](#-configuration-best-practices)
 
 ---
 
@@ -111,7 +111,7 @@ SMTP_PASS=
 | Variable | Default | Description |
 |:-----------|:---------|:-------------|
 | `KAFKA_BROKERS` | `kafka:9092` | Kafka broker addresses (comma-separated) |
-| `CLICKHOUSE_URL` | `http://clickhouse:8123` | ClickHouse HTTP endpoint |
+| `CLICKHOUSE_URL` | `http://default:password@clickhouse:8123` | ClickHouse HTTP endpoint (includes credentials) |
 | `BATCH_SIZE` | `100` | Messages per batch before insert |
 | `FLUSH_INTERVAL` | `5000` | Flush interval in milliseconds |
 
@@ -119,14 +119,14 @@ SMTP_PASS=
 | Variable | Default | Description |
 |:-----------|:---------|:-------------|
 | `PORT` | `4000` | API listening port |
-| `CLICKHOUSE_URL` | `http://clickhouse:8123` | ClickHouse endpoint |
+| `CLICKHOUSE_URL` | `http://default:password@clickhouse:8123` | ClickHouse endpoint (includes credentials) |
 | `REDIS_URL` | `redis://redis:6379` | Redis connection string |
-| `CACHE_TTL` | `30` | Cache TTL in seconds |
+| `CACHE_TTL` | `30` | Parsed but unused; cached routes pass hard-coded TTLs (300s trace detail, 30s service graph) |
 
 #### Trace Analyzer
 | Variable | Default | Description |
 |:-----------|:---------|:-------------|
-| `CLICKHOUSE_URL` | `http://clickhouse:8123` | ClickHouse endpoint |
+| `CLICKHOUSE_URL` | `http://default:password@clickhouse:8123` | ClickHouse endpoint (includes credentials) |
 | `LLM_PROVIDER` | `groq` | Provider: `groq`, `ollama`, or `mock` |
 | `GROQ_API_KEY` | (from .env) | Groq API key |
 | `GROQ_MODEL` | `llama-3.1-8b-instant` | Groq model name |
@@ -161,7 +161,7 @@ volumes:
   clickhouse_data:
 ```
 
-Persists ClickHouse data across container restarts. PostgreSQL data is stored in default volumes.
+Persists ClickHouse data across container restarts. PostgreSQL has **no named volume** in the current compose file: orders/inventory data lives in the container writable layer and is deleted by `docker compose down`. Use `docker compose stop` for restarts, and add a named volume before relying on this for production.
 
 ### Health Checks
 
@@ -493,9 +493,7 @@ batch:
 ### For Lower Latency
 
 #### Redis Cache
-```yaml
-CACHE_TTL: 60  # Longer caching
-```
+`CACHE_TTL` is not currently used. Cached routes pass fixed TTLs (300s for trace detail, 30s for the service graph), so changing this variable will not lengthen caching. Edit `query-api/index.js` if you need different TTLs.
 
 #### ClickHouse Queries
 - Ensure proper indexes
