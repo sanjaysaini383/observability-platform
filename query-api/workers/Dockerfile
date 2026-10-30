@@ -6,6 +6,7 @@ COPY query-api/workers/package*.json ./
 RUN npm ci --omit=dev
 
 COPY query-api/workers/trace-analyser.js .
+COPY query-api/workers/analysis-prompt.js .
 COPY shared /shared
 
 ENV CLICKHOUSE_URL=http://clickhouse:8123

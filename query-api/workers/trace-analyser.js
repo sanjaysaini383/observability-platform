@@ -1,6 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { escSql } from '../../shared/sql-utils.js';
+import { buildPrompt } from './analysis-prompt.js';
 
 dotenv.config();
 
@@ -125,36 +126,6 @@ async function storeAnalysis(trace, analysis) {
   } catch (error) {
     console.error('Error storing analysis:', error.message);
   }
-}
-
-// ── Prompt builder ───────────────────────────────────────────────────────────
-
-function buildPrompt(trace) {
-  const spanList = trace.spans
-    .map((span, idx) =>
-      `${idx + 1}. [${span[2]}] ${span[3]} | Duration: ${span[4]}ms | Status: ${span[5]}${
-        span[6] ? ` | Error: ${span[6]}` : ''
-      }`
-    )
-    .join('\n');
-
-  return `You are a distributed systems expert. Analyze this error trace from a microservices system and identify the root cause.
-
-Trace ID: ${trace.TraceId}
-Service: ${trace.ServiceName}
-Operation: ${trace.OperationName}
-Error: ${trace.StatusMessage || 'Unknown error'}
-
-Spans (oldest to newest):
-${spanList}
-
-Respond in JSON only, no markdown, no explanation:
-{
-  "root_cause": "one sentence description of what went wrong",
-  "impacted_services": ["service1", "service2"],
-  "severity": "low|medium|high|critical",
-  "recommendation": "one sentence actionable fix"
-}`;
 }
 
 // ── LLM Providers ────────────────────────────────────────────────────────────
