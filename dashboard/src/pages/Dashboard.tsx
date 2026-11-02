@@ -12,43 +12,52 @@ export default function Dashboard() {
     insights: [] as Awaited<ReturnType<typeof fetchInsights>>,
   });
 
-  const fetchData = async () => {
-    try {
-      const [metrics, insights, errors, services] = await Promise.all([
-        fetchMetrics('api-gateway', '1h').catch(() => []),
-        fetchInsights().catch(() => []),
-        fetchTraces({ status: 'error', limit: 10 }).catch(() => []),
-        fetchServices().catch(() => ({ nodes: [], edges: [] })),
-      ]);
-
-      const sparkline = metrics.map((m) => ({
-        time: m.time,
-        value: Math.round(m.rps * 60),
-      }));
-
-      const totalRequests = metrics.reduce((acc, m) => acc + m.rps * 60, 0);
-      const latest = metrics[metrics.length - 1];
-
-      setData({
-        kpis: {
-          totalRequests: Math.round(totalRequests),
-          errorRate: latest?.errors ?? 0,
-          p99: latest?.p99 ?? 0,
-          activeServices: services.nodes.length,
-        },
-        sparkline,
-        errors,
-        insights,
-      });
-    } catch (error) {
-      console.error('Failed to fetch dashboard data', error);
-    }
-  };
-
   useEffect(() => {
+    let active = true;
+
+    const fetchData = async () => {
+      try {
+        const [metrics, insights, errors, services] = await Promise.all([
+          fetchMetrics('api-gateway', '1h').catch(() => []),
+          fetchInsights().catch(() => []),
+          fetchTraces({ status: 'error', limit: 10 }).catch(() => []),
+          fetchServices().catch(() => ({ nodes: [], edges: [] })),
+        ]);
+
+        if (!active) return;
+
+        const sparkline = metrics.map((m) => ({
+          time: m.time,
+          value: Math.round(m.rps * 60),
+        }));
+
+        const totalRequests = metrics.reduce((acc, m) => acc + m.rps * 60, 0);
+        const latest = metrics[metrics.length - 1];
+
+        setData({
+          kpis: {
+            totalRequests: Math.round(totalRequests),
+            errorRate: latest?.errors ?? 0,
+            p99: latest?.p99 ?? 0,
+            activeServices: services.nodes.length,
+          },
+          sparkline,
+          errors,
+          insights,
+        });
+      } catch (error) {
+        if (active) {
+          console.error('Failed to fetch dashboard data', error);
+        }
+      }
+    };
+
     fetchData();
     const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (

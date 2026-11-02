@@ -4,6 +4,7 @@
 
 ### **Distributed tracing, OLAP analytics, and AI-powered root cause analysis — self-hosted, production-grade, zero SaaS lock-in.**
 
+[![CI](https://github.com/sanjaysaini383/observability-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/sanjaysaini383/observability-platform/actions/workflows/ci.yml)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-OTLP%20%2F%20W3C%20Trace%20Context-000000?style=for-the-badge&logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)
 [![Kafka](https://img.shields.io/badge/Apache%20Kafka-Backpressure%20Buffer-231F20?style=for-the-badge&logo=apache-kafka&logoColor=white)](https://kafka.apache.org/)
 [![ClickHouse](https://img.shields.io/badge/ClickHouse-Columnar%20OLAP-FFCC01?style=for-the-badge&logo=clickhouse&logoColor=black)](https://clickhouse.com/)
