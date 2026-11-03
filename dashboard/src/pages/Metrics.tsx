@@ -12,25 +12,45 @@ export default function Metrics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     const load = async () => {
       try {
         const [metrics, alertRows] = await Promise.all([
           fetchMetrics(service, window),
           fetchAlerts(),
         ]);
+        if (!active) return;
         setChartData(metrics);
         setAlerts(alertRows);
       } catch (err) {
-        console.error(err);
+        if (active) {
+          console.error(err);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
-    setLoading(true);
+
     load();
     const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [service, window]);
+
+  const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLoading(true);
+    setService(e.target.value);
+  };
+
+  const handleWindowChange = (value: string) => {
+    setLoading(true);
+    setWindow(value);
+  };
 
   return (
     <div className="space-y-6">
@@ -42,7 +62,7 @@ export default function Metrics() {
         <select
           className="bg-card border border-border text-sm rounded-md px-4 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
           value={service}
-          onChange={(e) => setService(e.target.value)}
+          onChange={handleServiceChange}
         >
           <option value="api-gateway">api-gateway</option>
           <option value="order-service">order-service</option>
@@ -52,7 +72,7 @@ export default function Metrics() {
         </select>
       </div>
 
-      <Tabs value={window} onValueChange={setWindow} defaultValue="1h" className="w-full">
+      <Tabs value={window} onValueChange={handleWindowChange} defaultValue="1h" className="w-full">
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="1h">Last 1 Hour</TabsTrigger>
           <TabsTrigger value="6h">Last 6 Hours</TabsTrigger>

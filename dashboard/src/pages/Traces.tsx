@@ -12,24 +12,34 @@ export default function Traces() {
   const [serviceFilter, setServiceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  const loadTraces = async () => {
-    try {
-      const params: { limit: number; service?: string; status?: string } = { limit: 50 };
-      if (serviceFilter) params.service = serviceFilter;
-      if (statusFilter) params.status = statusFilter;
-      const rows = await fetchTraces(params);
-      setTraces(rows);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let active = true;
+
+    const loadTraces = async () => {
+      try {
+        const params: { limit: number; service?: string; status?: string } = { limit: 50 };
+        if (serviceFilter) params.service = serviceFilter;
+        if (statusFilter) params.status = statusFilter;
+        const rows = await fetchTraces(params);
+        if (!active) return;
+        setTraces(rows);
+      } catch (err) {
+        if (active) {
+          console.error(err);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadTraces();
     const interval = setInterval(loadTraces, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [serviceFilter, statusFilter]);
 
   const handleSelectTrace = async (trace: TraceRow) => {
@@ -40,6 +50,16 @@ export default function Traces() {
     } catch {
       setTraceSpans([]);
     }
+  };
+
+  const handleServiceFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLoading(true);
+    setServiceFilter(e.target.value);
+  };
+
+  const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLoading(true);
+    setStatusFilter(e.target.value);
   };
 
   return (
@@ -55,7 +75,7 @@ export default function Traces() {
             <select
               className="bg-background border border-border text-sm rounded-md px-3 py-1.5 text-foreground"
               value={serviceFilter}
-              onChange={(e) => setServiceFilter(e.target.value)}
+              onChange={handleServiceFilterChange}
             >
               <option value="">All Services</option>
               <option value="api-gateway">api-gateway</option>
@@ -67,7 +87,7 @@ export default function Traces() {
             <select
               className="bg-background border border-border text-sm rounded-md px-3 py-1.5 text-foreground"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={handleStatusFilterChange}
             >
               <option value="">All Status</option>
               <option value="error">Error</option>
