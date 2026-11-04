@@ -1,5 +1,5 @@
 import express from 'express';
-import { trace } from '@opentelemetry/api';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import Razorpay from 'razorpay';
 import { logError } from '../tracing.js';
 
@@ -16,8 +16,7 @@ app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', service: 'payment-service' }));
 
-app.post('/pay', async (req, res) => {
-    const span = tracer.startSpan('process_payment');
+app.post('/pay', (req, res) => tracer.startActiveSpan('process_payment', async (span) => {
     try {
         const { orderId, amount } = req.body;
 
@@ -44,16 +43,16 @@ app.post('/pay', async (req, res) => {
         }
         
         span.setAttributes({ 'payment.order_id': orderId, 'razorpay.id': transactionId });
-        span.setStatus({ code: 0 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.OK });
         res.json({ success: true, transactionId });
     } catch(err) {
         span.recordException(err);
-        span.setStatus({ code: 2 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
         logError('Payment processing failed', err);
         res.status(500).json({ error: err.message });
+    } finally {
+        span.end();
     }
-});
+}));
 
 app.listen(port, () => console.log(`🚀 Payment Service on http://localhost:${port}`));

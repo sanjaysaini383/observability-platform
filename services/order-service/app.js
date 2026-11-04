@@ -1,5 +1,5 @@
 import express from 'express';
-import { trace } from '@opentelemetry/api';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import pkg from 'pg';
 import axios from 'axios';
 import { logError } from '../tracing.js';
@@ -37,15 +37,12 @@ app.post('/init', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', service: 'order-service' }));
 
-app.post('/orders', async (req, res) => {
-    const span = tracer.startSpan('create_order');
+app.post('/orders', (req, res) => tracer.startActiveSpan('create_order', async (span) => {
     try {
         const { customer, email, items } = req.body;
         
         span.addEvent('calling_inventory_reserve');
-        const invRes = await axios.post(`${INVENTORY_SERVICE_URL}/reserve`, { items }, {
-            headers: { 'traceparent': req.headers['traceparent'] || '' }
-        });
+        const invRes = await axios.post(`${INVENTORY_SERVICE_URL}/reserve`, { items });
         
         const total = invRes.data.total;
         
@@ -58,33 +55,32 @@ app.post('/orders', async (req, res) => {
         const orderId = result.rows[0].id;
         span.setAttributes({ 'order.id': orderId, 'order.total': total });
         
-        span.setStatus({ code: 0 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.OK });
         res.json({ orderId, total, status: 'pending' });
     } catch (err) {
         span.recordException(err);
-        span.setStatus({ code: 2 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
         logError('Order creation failed', err);
         res.status(err.response?.status || 500).json({ error: err.message });
+    } finally {
+        span.end();
     }
-});
+}));
 
-app.put('/orders/:id/pay', async (req, res) => {
-    const span = tracer.startSpan('update_order_status');
+app.put('/orders/:id/pay', (req, res) => tracer.startActiveSpan('update_order_status', async (span) => {
     try {
         const { id } = req.params;
         await pool.query("UPDATE orders SET status = 'paid' WHERE id = $1", [id]);
-        span.setStatus({ code: 0 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.OK });
         res.json({ success: true, orderId: id, status: 'paid' });
     } catch (err) {
         span.recordException(err);
-        span.setStatus({ code: 2 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
         logError('Order status update failed', err);
         res.status(500).json({ error: err.message });
+    } finally {
+        span.end();
     }
-});
+}));
 
 app.listen(port, () => console.log(`🚀 Order Service on http://localhost:${port}`));
