@@ -1,5 +1,5 @@
 import express from 'express';
-import { trace } from '@opentelemetry/api';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import nodemailer from 'nodemailer';
 import { logError } from '../tracing.js';
 
@@ -20,8 +20,7 @@ app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'healthy', service: 'notification-service' }));
 
-app.post('/send', async (req, res) => {
-    const span = tracer.startSpan('send_email');
+app.post('/send', (req, res) => tracer.startActiveSpan('send_email', async (span) => {
     try {
         const { email, orderId, status } = req.body;
         
@@ -46,16 +45,16 @@ app.post('/send', async (req, res) => {
             await new Promise(resolve => setTimeout(resolve, 200));
         }
 
-        span.setStatus({ code: 0 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.OK });
         res.json({ success: true });
     } catch(err) {
         span.recordException(err);
-        span.setStatus({ code: 2 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
         logError('Notification send failed', err);
         res.status(500).json({ error: err.message });
+    } finally {
+        span.end();
     }
-});
+}));
 
 app.listen(port, () => console.log(`🚀 Notification Service on http://localhost:${port}`));

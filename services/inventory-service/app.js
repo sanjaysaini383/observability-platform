@@ -1,5 +1,5 @@
 import express from 'express';
-import { trace } from '@opentelemetry/api';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import pkg from 'pg';
 import { logError } from '../tracing.js';
 
@@ -45,25 +45,23 @@ app.post('/init', async (req, res) => {
 app.get('/health', (req, res) => res.json({ status: 'healthy', service: 'inventory-service' }));
 
 // Fetch products
-app.get('/products', async (req, res) => {
-    const span = tracer.startSpan('get_products');
+app.get('/products', (req, res) => tracer.startActiveSpan('get_products', async (span) => {
     try {
         const result = await pool.query('SELECT * FROM products');
-        span.setStatus({ code: 0 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.OK });
         res.json(result.rows);
     } catch (err) {
         span.recordException(err);
-        span.setStatus({ code: 2 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
         logError('Failed to fetch products', err);
         res.status(500).json({ error: err.message });
+    } finally {
+        span.end();
     }
-});
+}));
 
 // Reserve stock and calculate total
-app.post('/reserve', async (req, res) => {
-    const span = tracer.startSpan('reserve_stock');
+app.post('/reserve', (req, res) => tracer.startActiveSpan('reserve_stock', async (span) => {
     try {
         const { items } = req.body;
         let total = 0;
@@ -102,16 +100,16 @@ app.post('/reserve', async (req, res) => {
         }
 
         span.setAttributes({ 'inventory.items_count': items.length, 'inventory.total': total });
-        span.setStatus({ code: 0 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.OK });
         res.json({ success: true, total });
     } catch (err) {
         span.recordException(err);
-        span.setStatus({ code: 2 });
-        span.end();
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
         logError('Stock reservation failed', err);
         res.status(500).json({ error: err.message });
+    } finally {
+        span.end();
     }
-});
+}));
 
 app.listen(port, () => console.log(`🚀 Inventory Service on http://localhost:${port}`));

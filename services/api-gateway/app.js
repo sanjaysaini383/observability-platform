@@ -38,9 +38,7 @@ app.get('/health', (req, res) => {
 
 app.get('/products', async (req, res) => {
     try {
-        const response = await axios.get(`${INVENTORY_SERVICE_URL}/products`, {
-            headers: { 'traceparent': req.headers['traceparent'] || '' }
-        });
+        const response = await axios.get(`${INVENTORY_SERVICE_URL}/products`);
         res.json(response.data);
     } catch (err) {
         logError('Failed to fetch products', err);
@@ -51,33 +49,30 @@ app.get('/products', async (req, res) => {
 app.post('/checkout', authenticate, async (req, res) => {
     try {
         const { items } = req.body;
-        const tp = req.headers['traceparent'] || '';
 
         // 1. Create order
         const orderRes = await axios.post(`${ORDER_SERVICE_URL}/orders`, {
             customer: req.user.name,
             email: req.user.email,
             items
-        }, { headers: { 'traceparent': tp }});
+        });
         
         const { orderId, total } = orderRes.data;
 
         // 2. Process payment
         const paymentRes = await axios.post(`${PAYMENT_SERVICE_URL}/pay`, {
             orderId, amount: total
-        }, { headers: { 'traceparent': tp }});
+        });
 
         // 3. Mark as paid
-        await axios.put(`${ORDER_SERVICE_URL}/orders/${orderId}/pay`, {}, {
-            headers: { 'traceparent': tp }
-        });
+        await axios.put(`${ORDER_SERVICE_URL}/orders/${orderId}/pay`, {});
 
         // 4. Send notification
         await axios.post(`${NOTIFICATION_SERVICE_URL}/send`, {
             email: req.user.email,
             orderId,
             status: 'paid'
-        }, { headers: { 'traceparent': tp }});
+        });
 
         res.json({ success: true, orderId, transactionId: paymentRes.data.transactionId });
     } catch (err) {
