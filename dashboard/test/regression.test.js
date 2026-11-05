@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
@@ -24,7 +24,6 @@ describe('Dashboard Lint & Architecture Regression Tests', () => {
     const eslint = new ESLint({ cwd: dashboardRoot });
     const results = await eslint.lintFiles([
       'src/**/*.{ts,tsx}',
-      '@/**/*.{ts,tsx}',
     ]);
 
     const totalErrors = results.reduce((sum, r) => sum + r.errorCount, 0);
@@ -50,9 +49,9 @@ describe('Dashboard Lint & Architecture Regression Tests', () => {
   test('Component files isolate exports to React components (Fast Refresh compliance)', () => {
     const filesToCheck = [
       resolve(dashboardRoot, 'src/components/ui/badge.tsx'),
-      resolve(dashboardRoot, '@/components/ui/badge.tsx'),
-      resolve(dashboardRoot, '@/components/ui/button.tsx'),
-      resolve(dashboardRoot, '@/components/ui/tabs.tsx'),
+      resolve(dashboardRoot, 'src/components/ui/card.tsx'),
+      resolve(dashboardRoot, 'src/components/ui/table.tsx'),
+      resolve(dashboardRoot, 'src/components/ui/tabs.tsx'),
     ];
 
     for (const filePath of filesToCheck) {
@@ -68,9 +67,6 @@ describe('Dashboard Lint & Architecture Regression Tests', () => {
   test('Variant modules export their respective CVA variants', () => {
     const variantFiles = [
       { path: resolve(dashboardRoot, 'src/components/ui/badge-variants.ts'), name: 'badgeVariants' },
-      { path: resolve(dashboardRoot, '@/components/ui/badge-variants.ts'), name: 'badgeVariants' },
-      { path: resolve(dashboardRoot, '@/components/ui/button-variants.ts'), name: 'buttonVariants' },
-      { path: resolve(dashboardRoot, '@/components/ui/tabs-variants.ts'), name: 'tabsListVariants' },
     ];
 
     for (const { path, name } of variantFiles) {
@@ -81,6 +77,15 @@ describe('Dashboard Lint & Architecture Regression Tests', () => {
         `${path} must define and export ${name}`
       );
     }
+  });
+
+  test('Stray dashboard/@ directory does not exist', () => {
+    const strayDir = resolve(dashboardRoot, '@');
+    assert.equal(
+      existsSync(strayDir),
+      false,
+      `Stray directory ${strayDir} must not exist; canonical UI components must reside in src/components/ui`
+    );
   });
 
   test('Pages implement active cancellation flag and cleanup in polling effects', () => {
