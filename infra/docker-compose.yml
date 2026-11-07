@@ -123,6 +123,7 @@ services:
       PAYMENT_SERVICE_URL: http://payment-service:3001
       INVENTORY_SERVICE_URL: http://inventory-service:5001
       NOTIFICATION_SERVICE_URL: http://notification-service:5002
+      JWT_SECRET: ${JWT_SECRET:-}
     networks:
       - observability
     healthcheck:

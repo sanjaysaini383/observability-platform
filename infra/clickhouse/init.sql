@@ -129,19 +129,21 @@ GROUP BY source_service, source_operation, target_service, target_operation
 ORDER BY call_count DESC;
 
 -- Error trace summary: quickly identify problematic traces
+-- One row per trace. ServiceName / OperationName / StartTime / Duration /
+-- StatusMessage describe the first failing span; services_with_errors lists
+-- every service that had an error span in the trace.
+-- Existing installs: init.sql only runs on a fresh volume, so run
+--   DROP VIEW IF EXISTS error_traces;
+-- and then this statement again to pick up the change.
 CREATE VIEW IF NOT EXISTS error_traces AS
 SELECT
   TraceId,
-  ServiceName,
-  OperationName,
-  StartTime,
-  Duration,
-  StatusMessage,
-  arrayDistinct(
-    groupArray(if(StatusCode = 2, ServiceName, ''))
-  ) AS services_with_errors
+  argMin(ServiceName, StartTime) AS ServiceName,
+  argMin(OperationName, StartTime) AS OperationName,
+  min(StartTime) AS StartTime,
+  argMin(Duration, StartTime) AS Duration,
+  argMin(StatusMessage, StartTime) AS StatusMessage,
+  groupUniqArray(ServiceName) AS services_with_errors
 FROM traces
 WHERE StatusCode = 2
-GROUP BY TraceId, ServiceName, OperationName, StartTime, Duration, StatusMessage
-ORDER BY StartTime DESC
-LIMIT 1000;
+GROUP BY TraceId;

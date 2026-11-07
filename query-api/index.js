@@ -391,6 +391,7 @@ app.get('/api/error-traces', async (req, res) => {
         StatusMessage,
         services_with_errors
       FROM error_traces
+      ORDER BY StartTime DESC
       LIMIT ${Math.min(parseInt(limit) || 50, 100)}
     `;
 

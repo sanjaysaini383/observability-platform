@@ -207,8 +207,8 @@ Two plain views compute the other dashboard pages on the fly:
 - **`service_dependencies`** — self-joins `traces` on `ParentSpanId = SpanId` within the
   last hour to build the service graph (who calls whom, how often, how slow, how many
   errors).
-- **`error_traces`** — groups spans by `TraceId` where `StatusCode = 2`, producing the
-  error feed.
+- **`error_traces`** — groups spans by `TraceId` where `StatusCode = 2`, producing one
+  row per failing trace for the error feed.
 
 ### Redis
 **Intuition:** the service graph and metrics queries are expensive (joins/aggregations

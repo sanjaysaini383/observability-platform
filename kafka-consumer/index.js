@@ -8,6 +8,7 @@ import {
   parseMetricsMessage,
   parseLogsMessage,
 } from './otlp-parser.js';
+import { createShutdown } from './shutdown.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ const kafka = new Kafka({
 });
 
 const consumer = kafka.consumer({ groupId: 'otel-consumer-group' });
+let flushTimer = null;
 
 let tracesBatch = [];
 let metricsBatch = [];
@@ -225,7 +227,7 @@ async function setupConsumer() {
   });
 
   // Flush batches periodically
-  setInterval(flushBatches, FLUSH_INTERVAL);
+  flushTimer = setInterval(flushBatches, FLUSH_INTERVAL);
 }
 
 /**
@@ -251,12 +253,14 @@ async function start() {
 /**
  * Graceful shutdown
  */
-process.on('SIGINT', async () => {
-  console.log('\n⏹️  Shutting down consumer...');
-  await flushBatches();
-  await consumer.disconnect();
-  console.log('✓ Consumer stopped');
-  process.exit(0);
+// Docker sends SIGTERM on `docker compose stop` and on redeploys, so handle it
+// the same way as Ctrl+C.
+const shutdown = createShutdown({
+  stopTimer: () => clearInterval(flushTimer),
+  consumer,
+  flush: flushBatches,
 });
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 start();
