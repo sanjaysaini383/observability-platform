@@ -366,7 +366,9 @@ curl "http://localhost:4000/api/insights/a1b2c3d4e5f6..."
 ### Error Traces
 
 #### `GET /api/error-traces`
-List recent error traces.
+List recent error traces, one row per trace. The service, operation, time, duration
+and message come from the first failing span; `services_with_errors` lists every
+service with an error span in that trace.
 
 **Query Parameters:**
 
@@ -385,7 +387,7 @@ List recent error traces.
       "StartTimeStr": "2026-10-28 10:30:45",
       "DurationMs": 5001.2,
       "StatusMessage": "Gateway timeout",
-      "services_with_errors": ["payment-service"]
+      "services_with_errors": ["payment-service", "api-gateway"]
     }
   ],
   "count": 25

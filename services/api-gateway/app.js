@@ -1,6 +1,6 @@
 import express from 'express';
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
+import { createAuthenticate } from './auth.js';
 import cors from 'cors';
 import { logError } from '../tracing.js';
 
@@ -15,22 +15,8 @@ const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http:/
 app.use(express.json());
 app.use(cors());
 
-// Optional JWT Middleware
-const authenticate = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-        const token = authHeader.split(' ')[1];
-        jwt.verify(token, 'secret_key', (err, user) => {
-            if (err) { return res.sendStatus(403); }
-            req.user = user;
-            next();
-        });
-    } else {
-        // Mock user for testing
-        req.user = { email: 'customer@example.com', name: 'Test User' };
-        next();
-    }
-};
+// Optional JWT middleware (secret comes from JWT_SECRET)
+const authenticate = createAuthenticate();
 
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'api-gateway' });
