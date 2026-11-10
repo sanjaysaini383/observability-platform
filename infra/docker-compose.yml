@@ -243,7 +243,6 @@ services:
       KAFKA_BROKERS: kafka:9092
       CLICKHOUSE_URL: http://default:password@clickhouse:8123
       BATCH_SIZE: 100
-      FLUSH_INTERVAL: 5000
     networks:
       - observability
 

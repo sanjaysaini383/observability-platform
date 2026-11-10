@@ -8,13 +8,13 @@ import {
   parseMetricsMessage,
   parseLogsMessage,
 } from './otlp-parser.js';
+import { createBatchHandler } from './batch-handler.js';
 
 dotenv.config();
 
 const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || 'kafka:9092').split(',');
 const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL || 'http://clickhouse:8123';
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '100', 10);
-const FLUSH_INTERVAL = parseInt(process.env.FLUSH_INTERVAL || '5000', 10);
 
 const kafka = new Kafka({
   clientId: 'otel-consumer',
@@ -27,10 +27,6 @@ const kafka = new Kafka({
 });
 
 const consumer = kafka.consumer({ groupId: 'otel-consumer-group' });
-
-let tracesBatch = [];
-let metricsBatch = [];
-let logsBatch = [];
 
 /**
  * Insert spans into ClickHouse
@@ -157,75 +153,24 @@ async function insertLogs(rows) {
 }
 
 /**
- * Flush batches to ClickHouse
- */
-async function flushBatches() {
-  try {
-    if (tracesBatch.length > 0) {
-      const batch = tracesBatch;
-      tracesBatch = [];
-      await insertTraces(batch);
-    }
-    if (metricsBatch.length > 0) {
-      const batch = metricsBatch;
-      metricsBatch = [];
-      await insertMetrics(batch);
-    }
-    if (logsBatch.length > 0) {
-      const batch = logsBatch;
-      logsBatch = [];
-      await insertLogs(batch);
-    }
-  } catch (error) {
-    console.error('Error flushing batches:', error.message);
-  }
-}
-
-/**
  * Setup message handlers
  */
 async function setupConsumer() {
   await consumer.subscribe({ topics: ['otel.traces', 'otel.metrics', 'otel.logs'] });
 
   await consumer.run({
-    eachMessage: async ({ topic, partition, message }) => {
-      try {
-        if (topic === 'otel.traces') {
-          const spans = parseTraceMessage(message.value);
-          tracesBatch.push(...spans);
-
-          if (tracesBatch.length >= BATCH_SIZE) {
-            const batch = tracesBatch;
-            tracesBatch = [];
-            await insertTraces(batch);
-          }
-        } else if (topic === 'otel.metrics') {
-          const rows = parseMetricsMessage(message.value);
-          metricsBatch.push(...rows);
-
-          if (metricsBatch.length >= BATCH_SIZE) {
-            const batch = metricsBatch;
-            metricsBatch = [];
-            await insertMetrics(batch);
-          }
-        } else if (topic === 'otel.logs') {
-          const rows = parseLogsMessage(message.value);
-          logsBatch.push(...rows);
-
-          if (logsBatch.length >= BATCH_SIZE) {
-            const batch = logsBatch;
-            logsBatch = [];
-            await insertLogs(batch);
-          }
-        }
-      } catch (error) {
-        console.error(`Error processing message from ${topic}:`, error.message);
-      }
-    },
+    // Offsets are resolved by the handler only after ClickHouse accepts the
+    // rows; a failed insert makes kafkajs retry and re-deliver the batch.
+    eachBatchAutoResolve: false,
+    eachBatch: createBatchHandler({
+      batchSize: BATCH_SIZE,
+      handlers: {
+        'otel.traces': { parse: parseTraceMessage, insert: insertTraces },
+        'otel.metrics': { parse: parseMetricsMessage, insert: insertMetrics },
+        'otel.logs': { parse: parseLogsMessage, insert: insertLogs },
+      },
+    }),
   });
-
-  // Flush batches periodically
-  setInterval(flushBatches, FLUSH_INTERVAL);
 }
 
 /**
@@ -253,7 +198,6 @@ async function start() {
  */
 process.on('SIGINT', async () => {
   console.log('\n⏹️  Shutting down consumer...');
-  await flushBatches();
   await consumer.disconnect();
   console.log('✓ Consumer stopped');
   process.exit(0);

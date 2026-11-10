@@ -5,7 +5,7 @@ WORKDIR /app
 COPY kafka-consumer/package*.json ./
 RUN npm install --omit=dev
 
-COPY kafka-consumer/index.js kafka-consumer/otlp-parser.js ./
+COPY kafka-consumer/index.js kafka-consumer/otlp-parser.js kafka-consumer/batch-handler.js ./
 COPY shared /shared
 
 ENV KAFKA_BROKERS=kafka:9092
