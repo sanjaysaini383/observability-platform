@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in TraceLens is broken or behaves differently from the docs.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please search [existing issues](https://github.com/sanjaysaini383/observability-platform/issues) first.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Dashboard (React)
+        - Query API
+        - Kafka consumer
+        - AI trace analyser
+        - Demo services (api-gateway, order, payment, inventory, notification)
+        - OTel Collector / Kafka / ClickHouse / docker-compose
+        - Docs
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. cd infra && docker compose up --build
+        2. ./load-gen.sh
+        3. Open http://localhost:8080/traces
+        4. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Output of `docker compose logs <service>` or the browser console. This is rendered as code, no need for backticks.
+      render: shell
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "OS, Docker version, LLM_PROVIDER (groq / ollama / mock), commit SHA"
