@@ -3,9 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchMetrics, fetchAlerts, type MetricPoint, type AlertRow } from '@/lib/api';
+import { useServiceNames } from '@/hooks/useServiceNames';
 
 export default function Metrics() {
-  const [service, setService] = useState('api-gateway');
+  const serviceNames = useServiceNames();
+  const [service, setService] = useState('');
+  const selectedService = serviceNames.includes(service) ? service : (serviceNames[0] ?? '');
   const [window, setWindow] = useState('1h');
   const [chartData, setChartData] = useState<MetricPoint[]>([]);
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
@@ -17,7 +20,7 @@ export default function Metrics() {
     const load = async () => {
       try {
         const [metrics, alertRows] = await Promise.all([
-          fetchMetrics(service, window),
+          selectedService ? fetchMetrics(selectedService, window) : Promise.resolve([]),
           fetchAlerts(),
         ]);
         if (!active) return;
@@ -40,7 +43,7 @@ export default function Metrics() {
       active = false;
       clearInterval(interval);
     };
-  }, [service, window]);
+  }, [selectedService, window]);
 
   const handleServiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setLoading(true);
@@ -61,14 +64,11 @@ export default function Metrics() {
         </div>
         <select
           className="bg-card border border-border text-sm rounded-md px-4 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary"
-          value={service}
+          value={selectedService}
           onChange={handleServiceChange}
         >
-          <option value="api-gateway">api-gateway</option>
-          <option value="order-service">order-service</option>
-          <option value="payment-service">payment-service</option>
-          <option value="inventory-service">inventory-service</option>
-          <option value="notification-service">notification-service</option>
+          {serviceNames.length === 0 && <option value="">No active services</option>}
+          {serviceNames.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, AlertTriangle, Clock, Server } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
-import { fetchMetrics, fetchInsights, fetchTraces, fetchServices } from '@/lib/api';
+import { fetchMetrics, fetchInsights, fetchTraces, fetchServiceNames } from '@/lib/api';
 
 export default function Dashboard() {
   const [data, setData] = useState({
@@ -17,11 +17,11 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
-        const [metrics, insights, errors, services] = await Promise.all([
-          fetchMetrics('api-gateway', '1h').catch(() => []),
+        const serviceNames = await fetchServiceNames().catch(() => []);
+        const [metrics, insights, errors] = await Promise.all([
+          serviceNames.length ? fetchMetrics(serviceNames[0], '1h').catch(() => []) : Promise.resolve([]),
           fetchInsights().catch(() => []),
           fetchTraces({ status: 'error', limit: 10 }).catch(() => []),
-          fetchServices().catch(() => ({ nodes: [], edges: [] })),
         ]);
 
         if (!active) return;
@@ -39,7 +39,7 @@ export default function Dashboard() {
             totalRequests: Math.round(totalRequests),
             errorRate: latest?.errors ?? 0,
             p99: latest?.p99 ?? 0,
-            activeServices: services.nodes.length,
+            activeServices: serviceNames.length,
           },
           sparkline,
           errors,

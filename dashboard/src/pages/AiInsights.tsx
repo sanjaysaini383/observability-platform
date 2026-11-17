@@ -3,8 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2, Info, BrainCircuit } from 'lucide-react';
 import { fetchInsights, type InsightRow } from '@/lib/api';
+import { useServiceNames } from '@/hooks/useServiceNames';
 
 export default function AiInsights() {
+  const serviceNames = useServiceNames();
   const [insights, setInsights] = useState<InsightRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [severityFilter, setSeverityFilter] = useState('');
@@ -111,11 +113,7 @@ export default function AiInsights() {
           onChange={(e) => setServiceFilter(e.target.value)}
         >
           <option value="">All Services</option>
-          <option value="payment-service">payment-service</option>
-          <option value="order-service">order-service</option>
-          <option value="inventory-service">inventory-service</option>
-          <option value="api-gateway">api-gateway</option>
-          <option value="notification-service">notification-service</option>
+          {serviceNames.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </div>
 
