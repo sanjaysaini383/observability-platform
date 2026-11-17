@@ -183,6 +183,29 @@ app.get('/api/traces/:traceId', async (req, res) => {
 });
 
 /**
+ * GET /api/services/names
+ * Discover recently active services for dashboard filters (cached in Redis).
+ */
+app.get('/api/services/names', async (req, res) => {
+  try {
+    const result = await cachedQuery(
+      'services:names:24h',
+      `
+        SELECT DISTINCT ServiceName
+        FROM traces
+        WHERE StartTime > now() - INTERVAL 24 HOUR
+          AND ServiceName != ''
+        ORDER BY ServiceName
+      `
+    );
+    res.json({ services: (result.data || []).map((row) => row.ServiceName) });
+  } catch (error) {
+    console.error('Error fetching service names:', error.message);
+    res.status(503).json({ error: 'Failed to query service names', details: error.message });
+  }
+});
+
+/**
  * GET /api/services
  * Service dependency graph (cached, 30s TTL)
  */

@@ -126,6 +126,11 @@ export async function fetchMetrics(service: string, window: string): Promise<Met
   return Array.isArray(rows) ? rows.map(mapMetricPoint) : [];
 }
 
+export async function fetchServiceNames(): Promise<string[]> {
+  const res = await api.get('/api/services/names');
+  return Array.isArray(res.data?.services) ? res.data.services : [];
+}
+
 export async function fetchServices(): Promise<{
   nodes: { id: string; label: string }[];
   edges: ServiceEdge[];

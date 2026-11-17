@@ -3,8 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { fetchTraces, fetchTraceDetail, type TraceRow } from '@/lib/api';
+import { useServiceNames } from '@/hooks/useServiceNames';
 
 export default function Traces() {
+  const serviceNames = useServiceNames();
   const [traces, setTraces] = useState<TraceRow[]>([]);
   const [selectedTrace, setSelectedTrace] = useState<TraceRow | null>(null);
   const [traceSpans, setTraceSpans] = useState<Record<string, unknown>[]>([]);
@@ -78,11 +80,7 @@ export default function Traces() {
               onChange={handleServiceFilterChange}
             >
               <option value="">All Services</option>
-              <option value="api-gateway">api-gateway</option>
-              <option value="order-service">order-service</option>
-              <option value="payment-service">payment-service</option>
-              <option value="inventory-service">inventory-service</option>
-              <option value="notification-service">notification-service</option>
+              {serviceNames.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
             <select
               className="bg-background border border-border text-sm rounded-md px-3 py-1.5 text-foreground"
