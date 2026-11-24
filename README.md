@@ -148,7 +148,7 @@ flowchart TB
 | Layer | Technology | Role |
 |:---|:---|:---|
 | Instrumentation | OpenTelemetry SDK (Node.js) | Auto-instrument HTTP, DB, outbound calls |
-| Collection | OTel Collector Contrib `0.92.0` | Batch, limit memory, export to Kafka |
+| Collection | OTel Collector Contrib `0.104.0` | Batch, limit memory, export to Kafka |
 | Message broker | Apache Kafka `7.5.3` (Confluent) | Durable telemetry buffer, ingest/storage decoupling |
 | OLAP storage | ClickHouse `24.3` | Columnar trace storage, materialized percentile views |
 | Cache | Redis `7` Alpine | Hot query result caching |
